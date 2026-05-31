@@ -972,6 +972,8 @@ function AutoCampaignTab() {
   const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
   const [stats, setStats] = useState<AutoCampaignStats | null>(null);
   const [generated, setGenerated] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchText, setBatchText] = useState("");
 
   const validProducts = products.filter((p) => p.sku.trim() && p.asin.trim());
 
@@ -992,35 +994,97 @@ function AutoCampaignTab() {
     <div className="space-y-5">
       <PageHeader title="Auto Campaign 生成器" description="输入商品信息即可一键创建完整的 SP 自动广告活动，包含 4 种匹配类型的独立广告组" />
 
+      {!generated ? (
+        <>
+          {/* Step guide */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { step: "1", title: "添加商品", desc: "输入要投放的商品 SKU 和 ASIN，支持批量粘贴" },
+              { step: "2", title: "配置广告参数", desc: "设置品牌 *、品类 *、预算、竞价和广告结构" },
+              { step: "3", title: "生成 & 下载", desc: "自动创建 Close / Loose / Substitutes / Complements 4 个广告组" },
+            ].map((f) => (
+              <Card key={f.step} className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "var(--brand-primary)", color: "#fff" }}>{f.step}</span>
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{f.title}</span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-tertiary)" }}>{f.desc}</p>
+              </Card>
+            ))}
+          </div>
+
+          {/* 4 match types explanation */}
+          <div className="rounded-lg p-3 text-xs leading-relaxed" style={{ background: "var(--color-info-light)", color: "var(--color-info)", border: "1px solid var(--color-info)" }}>
+            <strong>Auto 广告 4 种匹配类型：</strong>
+            <span className="ml-1">
+              <strong>Close Match</strong>（紧密匹配）— 与商品高度相关的搜索词 ·
+              <strong> Loose Match</strong>（宽泛匹配）— 间接相关的搜索词 ·
+              <strong> Substitutes</strong>（替代品）— 与你商品相似的竞品详情页 ·
+              <strong> Complements</strong>（互补品）— 经常与你商品一起购买的商品详情页
+            </span>
+          </div>
+
       <Card>
         <CardHeader
           title="商品列表"
           action={
-            <Btn variant="outline" size="sm" onClick={() => setProducts((p) => [...p, { sku: "", asin: "" }])}>
-              {Icons.plus} 添加商品
-            </Btn>
+            <div className="flex gap-2">
+              <Btn variant="ghost" size="sm" onClick={() => setBatchMode(!batchMode)}>
+                {batchMode ? "逐个输入" : "批量粘贴"}
+              </Btn>
+              {!batchMode && (
+                <Btn variant="outline" size="sm" onClick={() => setProducts((p) => [...p, { sku: "", asin: "" }])}>
+                  {Icons.plus} 添加商品
+                </Btn>
+              )}
+            </div>
           }
         />
         <div className="px-5 pb-5 space-y-2">
-          {products.map((p, idx) => (
+          {batchMode ? (
+            <div className="space-y-2">
+              <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>每行一个商品，格式：<code className="px-1 py-0.5 rounded text-[11px]" style={{ background: "var(--surface-hover)" }}>SKU TAB/逗号 ASIN</code></p>
+              <textarea
+                className="w-full h-32 px-3 py-2 text-sm font-mono rounded-md resize-none"
+                style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                placeholder={"ABC-SKU1\tB0EXAMPLE1\nDEF-SKU2\tB0EXAMPLE2\nGHI-SKU3,B0EXAMPLE3"}
+                value={batchText}
+                onChange={(e) => setBatchText(e.target.value)}
+              />
+              <div className="flex justify-end">
+                <Btn variant="outline" size="sm" onClick={() => {
+                  const lines = batchText.split("\n").map((l) => l.trim()).filter(Boolean);
+                  const parsed = lines.map((l) => {
+                    const parts = l.split(/[\t,]+/).map((s) => s.trim());
+                    return { sku: parts[0] || "", asin: parts[1] || "" };
+                  }).filter((p) => p.sku || p.asin);
+                  if (parsed.length > 0) { setProducts(parsed); setBatchMode(false); setBatchText(""); }
+                }}>
+                  确认导入 ({batchText.split("\n").filter((l) => l.trim()).length} 行)
+                </Btn>
+              </div>
+            </div>
+          ) : (
+          products.map((p, idx) => (
             <div key={idx} className="flex gap-2 items-center group">
               <span className="text-xs w-6 text-right font-mono" style={{ color: "var(--text-tertiary)" }}>{idx + 1}.</span>
               <input placeholder="SKU"
                 className="flex-1 h-9 px-3 text-sm font-mono rounded-md transition-all"
-                style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
+                style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
                 value={p.sku} onChange={(e) => setProducts((prev) => prev.map((pr, i) => i === idx ? { ...pr, sku: e.target.value } : pr))} />
               <input placeholder="ASIN (B0XXXXXXXXX)"
                 className="flex-1 h-9 px-3 text-sm font-mono rounded-md transition-all"
-                style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
+                style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
                 value={p.asin} onChange={(e) => setProducts((prev) => prev.map((pr, i) => i === idx ? { ...pr, asin: e.target.value } : pr))} />
               {products.length > 1 && (
-                <button className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   style={{ color: "var(--color-danger)" }}
                   onClick={() => setProducts((prev) => prev.filter((_, i) => i !== idx))}
                 >{Icons.x}</button>
               )}
             </div>
-          ))}
+          ))
+          )}
         </div>
       </Card>
 
@@ -1028,8 +1092,8 @@ function AutoCampaignTab() {
         <CardHeader title="广告配置" />
         <div className="px-5 pb-5 space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Input label="品牌" placeholder="e.g. AGU" value={brand} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBrand(e.target.value)} />
-            <Input label="品类" placeholder="e.g. Jersey" value={category} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCategory(e.target.value)} />
+            <Input label="品牌 *" placeholder="e.g. AGU" value={brand} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBrand(e.target.value)} />
+            <Input label="品类 *" placeholder="e.g. Jersey" value={category} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCategory(e.target.value)} />
             <Input label="日预算 ($)" type="number" step="0.01" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBudget(e.target.value)} />
             <Input label="默认竞价 ($)" type="number" step="0.01" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
             <Select label="结构" value={structure} onChange={(e) => setStructure(e.target.value as "per-product" | "single")}>
@@ -1037,16 +1101,20 @@ function AutoCampaignTab() {
               <option value="single">合并为单个广告活动</option>
             </Select>
           </div>
-          <div className="flex justify-end pt-2">
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+              {validProducts.length} 个有效商品{!brand && " · 请填写品牌"}{!category && " · 请填写品类"}
+            </span>
             <Btn variant="primary" disabled={validProducts.length === 0 || !brand || !category} onClick={handleGenerate}>
               {Icons.zap} 生成 Auto Campaign
             </Btn>
           </div>
         </div>
       </Card>
-
-      {generated && stats && (
+        </>
+      ) : (
         <>
+          {stats && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <StatCard label="广告活动" value={stats.campaignCount} />
             <StatCard label="广告组" value={stats.adGroupCount} />
@@ -1054,13 +1122,19 @@ function AutoCampaignTab() {
             <StatCard label="竞价调整" value={stats.biddingAdjustmentCount} color="var(--color-warning)" />
             <StatCard label="总行数" value={stats.totalRows} color="var(--color-success)" />
           </div>
+          )}
           <Card>
             <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
               <div className="flex items-center gap-2">
                 <span style={{ color: "var(--color-success)" }}>{Icons.check}</span>
                 <span className="font-medium text-sm" style={{ color: "var(--color-success)" }}>生成完成</span>
               </div>
-              <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 下载 XLSX</Btn>
+              <div className="flex gap-2">
+                <Btn variant="ghost" size="sm" onClick={() => { setGenerated(false); setProducts([{ sku: "", asin: "" }]); setBulkRows([]); setStats(null); }}>
+                  {Icons.refresh} 重新开始
+                </Btn>
+                <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 下载 XLSX</Btn>
+              </div>
             </div>
             <div className="p-4">
               <DataTable headers={[
