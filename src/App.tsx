@@ -251,10 +251,11 @@ function Select({ label, children, ...props }: { label?: string } & React.Select
         {...props}
         className="w-full h-9 px-3 text-sm rounded-md transition-all duration-150 appearance-none bg-no-repeat bg-right pr-8"
         style={{
-          border: "1px solid var(--border-default)", background: "var(--surface-card)", boxShadow: "var(--shadow-xs)",
+          border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)", boxShadow: "var(--shadow-xs)",
           color: "var(--text-primary)",
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
           backgroundPosition: "right 8px center",
+          backgroundRepeat: "no-repeat",
         }}
       >
         {children}
