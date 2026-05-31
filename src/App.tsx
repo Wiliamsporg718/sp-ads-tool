@@ -380,8 +380,7 @@ interface ManualKeywordEntry {
 
 interface ManualAdGroup {
   name: string;
-  sku: string;
-  asin: string;
+  products: { sku: string; asin: string }[];  // multiple products per ad group
   keywords: ManualKeywordEntry[];
 }
 
@@ -397,7 +396,7 @@ function ManualCampaignTab() {
   const [mode, setMode] = useState<"keyword" | "asin">("keyword");
   const [campaigns, setCampaigns] = useState<ManualCampaign[]>([{
     name: "SP_Brand_Manual",
-    adGroups: [{ name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
+    adGroups: [{ name: "", products: [{ sku: "", asin: "" }], keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
   }]);
   const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
   const [stats, setStats] = useState<BulkSheetStats | null>(null);
@@ -422,7 +421,7 @@ function ManualCampaignTab() {
 
   const addAdGroup = useCallback((ci: number) => {
     setCampaigns((prev) => prev.map((c, i) => i === ci ? {
-      ...c, adGroups: [...c.adGroups, { name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
+      ...c, adGroups: [...c.adGroups, { name: "", products: [{ sku: "", asin: "" }], keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
     } : c));
   }, []);
 
@@ -472,16 +471,15 @@ function ManualCampaignTab() {
   const handleQuickTemplate = useCallback((ci: number) => {
     const camp = campaigns[ci];
     const baseName = camp.name || "SP_Manual";
-    const sku = camp.adGroups[0]?.sku || "";
-    const asin = camp.adGroups[0]?.asin || "";
+    const products = camp.adGroups[0]?.products || [{ sku: "", asin: "" }];
     const existingKws = camp.adGroups[0]?.keywords.filter((k) => k.keyword.trim()) || [];
     const templateKws = existingKws.length > 0 ? existingKws : [{ keyword: "", matchType: "exact" as const, bid: "" }];
 
     setCampaigns((prev) => prev.map((c, i) => i === ci ? {
       ...c, adGroups: [
-        { name: `${baseName}_Exact`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "exact" as const })) },
-        { name: `${baseName}_Phrase`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "phrase" as const })) },
-        { name: `${baseName}_Broad`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "broad" as const })) },
+        { name: `${baseName}_Exact`, products: products.map((p) => ({ ...p })), keywords: templateKws.map((k) => ({ ...k, matchType: "exact" as const })) },
+        { name: `${baseName}_Phrase`, products: products.map((p) => ({ ...p })), keywords: templateKws.map((k) => ({ ...k, matchType: "phrase" as const })) },
+        { name: `${baseName}_Broad`, products: products.map((p) => ({ ...p })), keywords: templateKws.map((k) => ({ ...k, matchType: "broad" as const })) },
       ],
     } : c));
   }, [campaigns]);
@@ -511,18 +509,37 @@ function ManualCampaignTab() {
       for (const camp of campaigns) {
         const campName = camp.name.trim() || "Manual Campaign";
         for (const group of camp.adGroups) {
-          if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
+          if (!group.name.trim() || group.products.every((p) => !p.sku.trim())) continue;
           for (const kw of group.keywords) {
             if (!kw.keyword.trim()) continue;
+            // Use the first product's info for the AD Detail row, but generate Product Ad rows for all
+            const firstProduct = group.products.find((p) => p.sku.trim()) || { sku: "", asin: "" };
             adDetailRows.push({
               campaignName: campName,
               adGroupName: group.name,
               budget: parseFloat(budget) || 10,
-              sku: group.sku,
-              asin: group.asin,
+              sku: firstProduct.sku,
+              asin: firstProduct.asin,
               bid: kw.bid ? parseFloat(kw.bid) : null,
               keywordText: kw.keyword,
               matchType: kw.matchType,
+              biddingStrategy,
+              startDate: "",
+            });
+          }
+          // Add extra product-only rows for additional products (will generate Product Ad rows)
+          for (let pi = 1; pi < group.products.length; pi++) {
+            const p = group.products[pi];
+            if (!p.sku.trim()) continue;
+            adDetailRows.push({
+              campaignName: campName,
+              adGroupName: group.name,
+              budget: parseFloat(budget) || 10,
+              sku: p.sku,
+              asin: p.asin,
+              bid: null,
+              keywordText: "",
+              matchType: "",
               biddingStrategy,
               startDate: "",
             });
@@ -547,7 +564,7 @@ function ManualCampaignTab() {
   }, [bulkRows, mode]);
 
   const totalKeywords = campaigns.reduce((sum, c) => sum + c.adGroups.reduce((s, g) => s + g.keywords.filter((k) => k.keyword.trim()).length, 0), 0);
-  const totalGroups = campaigns.reduce((sum, c) => sum + c.adGroups.filter((g) => g.name.trim() && (g.sku.trim() || g.asin.trim())).length, 0);
+  const totalGroups = campaigns.reduce((sum, c) => sum + c.adGroups.filter((g) => g.name.trim() && g.products.some((p) => p.sku.trim())).length, 0);
   const validCampaignCount = campaigns.filter((c) => c.name.trim() && c.adGroups.some((g) => g.name.trim())).length;
 
   return (
@@ -704,13 +721,41 @@ function ManualCampaignTab() {
                           )}
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Input label="广告组名称" placeholder="e.g. Brand_Exact" value={group.name}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(ci, gi, { name: e.target.value })} />
-                        <Input label="SKU" placeholder="ABC-123" value={group.sku}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(ci, gi, { sku: e.target.value })} />
-                        <Input label="ASIN" placeholder="B0XXXXXXXXX" value={group.asin}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(ci, gi, { asin: e.target.value })} />
+                      <Input label="广告组名称" placeholder="e.g. Brand_Exact" value={group.name}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(ci, gi, { name: e.target.value })} />
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>商品（SKU + ASIN）</label>
+                          <Btn variant="outline" size="sm" onClick={() => setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+                            ...c, adGroups: c.adGroups.map((g, j) => j === gi ? { ...g, products: [...g.products, { sku: "", asin: "" }] } : g),
+                          } : c))}>{Icons.plus} 添加商品</Btn>
+                        </div>
+                        {group.products.map((p, pi) => (
+                          <div key={pi} className="flex gap-2 items-center group">
+                            <input placeholder="SKU *" className="flex-1 h-9 px-3 text-sm font-mono rounded-md"
+                              style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                              value={p.sku} onChange={(e) => setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+                                ...c, adGroups: c.adGroups.map((g, j) => j === gi ? {
+                                  ...g, products: g.products.map((pp, kk) => kk === pi ? { ...pp, sku: e.target.value } : pp),
+                                } : g),
+                              } : c))} />
+                            <input placeholder="ASIN (可选)" className="flex-1 h-9 px-3 text-sm font-mono rounded-md"
+                              style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                              value={p.asin} onChange={(e) => setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+                                ...c, adGroups: c.adGroups.map((g, j) => j === gi ? {
+                                  ...g, products: g.products.map((pp, kk) => kk === pi ? { ...pp, asin: e.target.value } : pp),
+                                } : g),
+                              } : c))} />
+                            {group.products.length > 1 && (
+                              <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                                style={{ color: "var(--color-danger)" }}
+                                onClick={() => setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+                                  ...c, adGroups: c.adGroups.map((g, j) => j === gi ? { ...g, products: g.products.filter((_, kk) => kk !== pi) } : g),
+                                } : c))}>{Icons.x}</button>
+                            )}
+                          </div>
+                        ))}
                       </div>
 
                       <div>
@@ -793,7 +838,7 @@ function ManualCampaignTab() {
           {/* Add campaign + Generate */}
           <div className="flex items-center justify-between">
             <Btn variant="outline" onClick={() => setCampaigns((prev) => [...prev, {
-              name: "", adGroups: [{ name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
+              name: "", adGroups: [{ name: "", products: [{ sku: "", asin: "" }], keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
             }])}>
               {Icons.plus} 添加广告活动
             </Btn>
