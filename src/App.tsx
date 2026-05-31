@@ -713,6 +713,16 @@ function ManualCampaignTab() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Badge variant="success">广告组 {gi + 1}</Badge>
+                          <button className="p-1 rounded-md" style={{ color: "var(--text-tertiary)" }} title="复制广告组"
+                            onClick={() => setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+                              ...c, adGroups: [...c.adGroups.slice(0, gi + 1), {
+                                name: group.name + "_copy",
+                                products: group.products.map((p) => ({ ...p })),
+                                keywords: group.keywords.map((k) => ({ ...k })),
+                              }, ...c.adGroups.slice(gi + 1)],
+                            } : c))}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                          </button>
                           {camp.adGroups.length > 1 && (
                             <button className="p-1 rounded-md" style={{ color: "var(--color-danger)" }}
                               onClick={() => removeAdGroup(ci, gi)}>
@@ -748,7 +758,7 @@ function ManualCampaignTab() {
                                 } : g),
                               } : c))} />
                             {group.products.length > 1 && (
-                              <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                              <button className="p-1.5 rounded-md opacity-50 hover:opacity-100 transition-opacity"
                                 style={{ color: "var(--color-danger)" }}
                                 onClick={() => setCampaigns((prev) => prev.map((c, i) => i === ci ? {
                                   ...c, adGroups: c.adGroups.map((g, j) => j === gi ? { ...g, products: g.products.filter((_, kk) => kk !== pi) } : g),
@@ -764,6 +774,16 @@ function ManualCampaignTab() {
                             {mode === "keyword" ? "关键词" : "投放 ASIN"}
                           </label>
                           <div className="flex gap-1">
+                            <Btn variant="ghost" size="sm" onClick={() => {
+                              const bidVal = prompt("设置该广告组所有关键词的竞价（留空不修改）：");
+                              if (bidVal !== null && bidVal.trim()) {
+                                setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+                                  ...c, adGroups: c.adGroups.map((g, j) => j === gi ? {
+                                    ...g, keywords: g.keywords.map((k) => ({ ...k, bid: bidVal.trim() })),
+                                  } : g),
+                                } : c));
+                              }
+                            }}>批量竞价</Btn>
                             <Btn variant="ghost" size="sm" onClick={() => { setShowBatchPaste(showBatchPaste === `${ci}-${gi}` ? null : `${ci}-${gi}`); setBatchText(""); }}>
                               批量粘贴
                             </Btn>
@@ -792,38 +812,41 @@ function ManualCampaignTab() {
                             </div>
                           </div>
                         )}
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           {group.keywords.map((kw, ki) => (
-                            <div key={ki} className="flex gap-2 items-center group">
+                            <div key={ki} className="p-2 rounded-lg flex flex-wrap sm:flex-nowrap gap-2 items-center" style={{ background: ki % 2 === 0 ? "transparent" : "var(--surface-muted)" }}>
+                              <span className="text-xs w-5 text-right font-mono shrink-0" style={{ color: "var(--text-tertiary)" }}>{ki + 1}</span>
                               <input
                                 placeholder={mode === "keyword" ? "输入关键词..." : "B0XXXXXXXXX"}
-                                className="flex-1 h-9 px-3 text-sm rounded-md"
-                                style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                                className="flex-1 min-w-0 h-9 px-3 text-sm rounded-md"
+                                style={{ border: `1px solid ${kw.keyword.trim() ? "var(--border-default)" : "var(--color-warning)"}`, backgroundColor: "var(--surface-card)" }}
                                 value={kw.keyword} onChange={(e) => updateKeyword(ci, gi, ki, { keyword: e.target.value })}
                               />
-                              {mode === "keyword" && (
-                                <select
-                                  className="h-9 px-2 text-xs rounded-md appearance-none pr-7"
-                                  style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)", color: "var(--text-primary)", minWidth: "90px", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundPosition: "right 6px center", backgroundRepeat: "no-repeat" }}
-                                  value={kw.matchType} onChange={(e) => updateKeyword(ci, gi, ki, { matchType: e.target.value as "exact" | "phrase" | "broad" })}
-                                >
-                                  <option value="exact">Exact</option>
-                                  <option value="phrase">Phrase</option>
-                                  <option value="broad">Broad</option>
-                                </select>
-                              )}
-                              <input
-                                placeholder="$ 0.50"
-                                className="w-20 h-9 px-2 text-sm text-right font-mono rounded-md"
-                                style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
-                                value={kw.bid} onChange={(e) => updateKeyword(ci, gi, ki, { bid: e.target.value })}
-                              />
-                              {group.keywords.length > 1 && (
-                                <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                                  style={{ color: "var(--color-danger)" }} onClick={() => removeKeyword(ci, gi, ki)}>
-                                  {Icons.x}
-                                </button>
-                              )}
+                              <div className="flex gap-2 items-center shrink-0">
+                                {mode === "keyword" && (
+                                  <select
+                                    className="h-9 px-2 text-xs rounded-md appearance-none pr-7"
+                                    style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)", color: "var(--text-primary)", minWidth: "90px", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundPosition: "right 6px center", backgroundRepeat: "no-repeat" }}
+                                    value={kw.matchType} onChange={(e) => updateKeyword(ci, gi, ki, { matchType: e.target.value as "exact" | "phrase" | "broad" })}
+                                  >
+                                    <option value="exact">Exact</option>
+                                    <option value="phrase">Phrase</option>
+                                    <option value="broad">Broad</option>
+                                  </select>
+                                )}
+                                <input
+                                  placeholder="$ 0.50"
+                                  className="w-20 h-9 px-2 text-sm text-right font-mono rounded-md"
+                                  style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                                  value={kw.bid} onChange={(e) => updateKeyword(ci, gi, ki, { bid: e.target.value })}
+                                />
+                                {group.keywords.length > 1 && (
+                                  <button className="p-1.5 rounded-md opacity-50 hover:opacity-100 transition-opacity"
+                                    style={{ color: "var(--color-danger)" }} onClick={() => removeKeyword(ci, gi, ki)}>
+                                    {Icons.x}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -844,7 +867,12 @@ function ManualCampaignTab() {
             </Btn>
             <div className="flex items-center gap-3">
               <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                {validCampaignCount} 个广告活动 · {totalGroups} 个广告组 · {totalKeywords} 个{mode === "keyword" ? "关键词" : "ASIN"}
+                {validCampaignCount} 个广告活动 · {totalGroups} 个广告组 · {totalKeywords} 个有效{mode === "keyword" ? "关键词" : "ASIN"}
+                {(() => {
+                  const emptyKws = campaigns.reduce((s, c) => s + c.adGroups.reduce((s2, g) => s2 + g.keywords.filter((k) => !k.keyword.trim()).length, 0), 0);
+                  const emptyProds = campaigns.reduce((s, c) => s + c.adGroups.reduce((s2, g) => s2 + g.products.filter((p) => !p.sku.trim()).length, 0), 0);
+                  return (emptyKws > 0 || emptyProds > 0) ? <span style={{ color: "var(--color-warning)" }}>{emptyKws > 0 ? ` · ${emptyKws} 空关键词` : ""}{emptyProds > 0 ? ` · ${emptyProds} 空SKU` : ""}</span> : null;
+                })()}
               </span>
               <Btn variant="primary" disabled={totalGroups === 0 || totalKeywords === 0} onClick={handleGenerate}>
                 {Icons.zap} 生成 Bulk Sheet
@@ -1233,7 +1261,7 @@ function AutoCampaignTab() {
                 style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
                 value={p.asin} onChange={(e) => setProducts((prev) => prev.map((pr, i) => i === idx ? { ...pr, asin: e.target.value } : pr))} />
               {products.length > 1 && (
-                <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                <button className="p-1.5 rounded-md opacity-50 hover:opacity-100 transition-opacity"
                   style={{ color: "var(--color-danger)" }}
                   onClick={() => setProducts((prev) => prev.filter((_, i) => i !== idx))}
                 >{Icons.x}</button>
