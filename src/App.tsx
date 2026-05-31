@@ -84,13 +84,12 @@ const Icons = {
 // Tab config
 // ---------------------------------------------------------------------------
 
-type Tab = "manual" | "bulk" | "asin" | "auto" | "harvest";
+type Tab = "manual" | "auto" | "asin" | "harvest";
 
 const TAB_CONFIG: { key: Tab; label: string; desc: string }[] = [
-  { key: "manual", label: "手动投放", desc: "关键词/ASIN" },
+  { key: "manual", label: "手动投放", desc: "创建广告" },
   { key: "auto", label: "Auto Campaign", desc: "自动广告" },
   { key: "asin", label: "ASIN 组合", desc: "防御组合" },
-  { key: "bulk", label: "Bulk Sheet", desc: "文件转换" },
   { key: "harvest", label: "搜索词分析", desc: "收割/否定" },
 ];
 
@@ -133,8 +132,8 @@ export default function App() {
       {/* Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="animate-fadeIn">
-          {tab === "bulk" && <BulkSheetTab />}
           {tab === "manual" && <ManualCampaignTab />}
+          {tab === "auto" && <AutoCampaignTab />}
           {tab === "asin" && <AsinPrepTab />}
           {tab === "auto" && <AutoCampaignTab />}
           {tab === "harvest" && <SearchTermHarvesterTab />}
@@ -369,179 +368,7 @@ function downloadXlsx(sheets: { name: string; data: unknown[][] }[], fileName: s
 }
 
 // ===========================================================================
-// Tab 1: Bulk Sheet
-// ===========================================================================
-
-function BulkSheetTab() {
-  const [fileName, setFileName] = useState("");
-  const [rows, setRows] = useState<AdDetailRow[]>([]);
-  const [errors, setErrors] = useState<{ row: number; field: string; message: string }[]>([]);
-  const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
-  const [stats, setStats] = useState<BulkSheetStats | null>(null);
-  const [mode, setMode] = useState<"keyword" | "asin">("keyword");
-  const [defaultBid, setDefaultBid] = useState("0.50");
-  const [step, setStep] = useState<"upload" | "config" | "result">("upload");
-
-  const handleFile = useCallback((file: File) => {
-    file.arrayBuffer().then((buffer) => {
-      const wb = XLSX.read(buffer, { type: "array" });
-      const sheetName = wb.SheetNames.find((n) =>
-        ["AD Detail Keywords", "AD Detail ASIN", "AD Detail", "Sheet1", "数据"].includes(n),
-      ) || wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 }) as unknown[][];
-      const parsed = parseAdDetailRows(raw);
-      setFileName(file.name); setRows(parsed);
-      setErrors(validateAdDetailRows(parsed, { mode }));
-      setStep("config");
-    });
-  }, [mode]);
-
-  const handleGenerate = useCallback(() => {
-    const opts: BulkSheetOptions = { defaultAdGroupBid: defaultBid, targetingType: "manual", mode };
-    const result = generateBulkSheet(rows, opts);
-    setBulkRows(result); setStats(getBulkSheetStats(result)); setStep("result");
-  }, [rows, defaultBid, mode]);
-
-  const handleDownload = useCallback(() => {
-    const prefix = mode === "asin" ? "BULK ASIN" : "BULK MANUAL";
-    downloadXlsx(
-      [{ name: prefix, data: [[...BULK_SHEET_HEADERS], ...bulkRows.map(bulkRowToArray)] }],
-      `${prefix} ${new Date().toISOString().slice(0, 10)}.xlsx`,
-    );
-  }, [bulkRows, mode]);
-
-  return (
-    <div className="space-y-5">
-      <PageHeader title="Bulk Sheet 生成器" description="将你的广告规划表转换为 Amazon Seller Central 可直接上传的 Bulk Sheet 格式" />
-
-      {step === "upload" && (
-        <>
-          {/* Feature explanation */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
-            {[
-              { step: "1", title: "上传广告规划表", desc: "上传包含广告活动、广告组、SKU、关键词等信息的 AD Detail 表格" },
-              { step: "2", title: "设置投放参数", desc: "选择投放模式（关键词 / ASIN），设置默认竞价" },
-              { step: "3", title: "下载 Bulk Sheet", desc: "自动生成符合 Amazon 格式规范的 Bulk Upload 文件" },
-            ].map((f) => (
-              <Card key={f.step} className="p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "var(--brand-primary)", color: "#fff" }}>{f.step}</span>
-                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{f.title}</span>
-                </div>
-                <p className="text-xs leading-relaxed" style={{ color: "var(--text-tertiary)" }}>{f.desc}</p>
-              </Card>
-            ))}
-          </div>
-          <Card>
-            <div className="p-6">
-              <FileUpload onFile={handleFile} label="上传 AD Detail 规划表" hint="支持 .xlsx / .xls / .xlsm — 包含广告活动名称、广告组、SKU、关键词/ASIN 等列" />
-            </div>
-          </Card>
-          <div className="text-center">
-            <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-              没有 AD Detail 文件？
-              <button className="underline ml-1" style={{ color: "var(--color-info)" }}
-                onClick={() => {
-                  downloadXlsx([{
-                    name: "AD Detail Keywords",
-                    data: [
-                      ["广告活动名称", "广告组名称", "预算", "SKU", "ASIN", "出价", "关键词", "匹配类型", "竞价策略", "开始日期"],
-                      ["SP_Brand_Exact", "Brand_Exact", 10, "ABC-123", "B0EXAMPLE1", 0.5, "example keyword", "exact", "Dynamic bids - down only", ""],
-                    ],
-                  }], "AD Detail 模板.xlsx");
-                }}>下载模板文件</button>
-              ，或使用<button className="underline ml-1" style={{ color: "var(--color-info)" }}>手动投放</button>功能直接手动创建
-            </p>
-          </div>
-        </>
-      )}
-
-      {step === "config" && (
-        <>
-          <Card>
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg p-2" style={{ background: "var(--color-success-light)", color: "var(--color-success)" }}>{Icons.file}</div>
-                <div>
-                  <p className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>{fileName}</p>
-                  <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                    {rows.length} 行数据
-                    {errors.length > 0 && <span style={{ color: "var(--color-warning)" }}> · {errors.length} 个警告</span>}
-                  </p>
-                </div>
-              </div>
-              <Btn variant="ghost" size="sm" onClick={() => { setStep("upload"); setRows([]); }}>
-                {Icons.refresh} 重新选择
-              </Btn>
-            </div>
-          </Card>
-          <Card>
-            <CardHeader title="参数配置" />
-            <div className="px-5 pb-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Select label="投放模式" value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "asin")}>
-                  <option value="keyword">关键词投放 (Keywords)</option>
-                  <option value="asin">商品投放 (ASIN Targeting)</option>
-                </Select>
-                <Input label="默认竞价 ($)" type="number" step="0.01" min="0.02" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
-              </div>
-              <div className="flex justify-end pt-2">
-                <Btn variant="primary" onClick={handleGenerate}>{Icons.zap} 生成 Bulk Sheet</Btn>
-              </div>
-            </div>
-          </Card>
-        </>
-      )}
-
-      {step === "result" && stats && (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="广告活动" value={stats.campaignCount} />
-            <StatCard label="广告组" value={stats.adGroupCount} />
-            <StatCard label="商品广告" value={stats.productAdCount} />
-            <StatCard label="总行数" value={stats.totalRows} color="var(--color-success)" />
-            {stats.keywordCount > 0 && <StatCard label="关键词" value={stats.keywordCount} color="var(--color-info)" />}
-            {stats.productTargetingCount > 0 && <StatCard label="商品投放" value={stats.productTargetingCount} color="var(--color-purple)" />}
-          </div>
-          <Card>
-            <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <div className="flex items-center gap-2">
-                <span style={{ color: "var(--color-success)" }}>{Icons.check}</span>
-                <span className="font-medium text-sm" style={{ color: "var(--color-success)" }}>生成完成</span>
-              </div>
-              <div className="flex gap-2">
-                <Btn variant="ghost" size="sm" onClick={() => { setStep("upload"); setRows([]); setBulkRows([]); setStats(null); }}>
-                  {Icons.refresh} 重新开始
-                </Btn>
-                <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 下载 XLSX</Btn>
-              </div>
-            </div>
-            <div className="p-4">
-              <DataTable headers={[
-                { label: "#" }, { label: "Entity" }, { label: "Campaign" }, { label: "Ad Group" }, { label: "SKU" }, { label: "Keyword / ASIN" },
-              ]}>
-                {bulkRows.slice(0, 50).map((row, idx) => (
-                  <tr key={idx} className="hover:bg-[var(--surface-hover)]" style={{ borderBottom: "1px solid var(--border-default)" }}>
-                    <td className="p-2.5 text-xs" style={{ color: "var(--text-tertiary)" }}>{idx + 1}</td>
-                    <td className="p-2.5"><EntityBadge entity={row.entity} /></td>
-                    <td className="p-2.5 text-xs max-w-[180px] truncate">{row.campaignNameInfo}</td>
-                    <td className="p-2.5 text-xs max-w-[140px] truncate">{row.adGroupNameInfo}</td>
-                    <td className="p-2.5 text-xs font-mono">{row.sku}</td>
-                    <td className="p-2.5 text-xs max-w-[140px] truncate">{row.keywordText || row.productTargetingExpression}</td>
-                  </tr>
-                ))}
-              </DataTable>
-            </div>
-          </Card>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ===========================================================================
-// Tab 2: Manual Campaign (Keyword / ASIN Targeting)
+// Manual Campaign (Keyword / ASIN Targeting)
 // ===========================================================================
 
 interface ManualKeywordEntry {
@@ -571,6 +398,11 @@ function ManualCampaignTab() {
   const [generated, setGenerated] = useState(false);
   const [showBatchPaste, setShowBatchPaste] = useState<number | null>(null);
   const [batchText, setBatchText] = useState("");
+  // File import state
+  const [inputSource, setInputSource] = useState<"manual" | "file">("manual");
+  const [fileRows, setFileRows] = useState<AdDetailRow[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [fileErrors, setFileErrors] = useState<{ row: number; field: string; message: string }[]>([]);
 
   const updateAdGroup = useCallback((idx: number, patch: Partial<ManualAdGroup>) => {
     setAdGroups((prev) => prev.map((g, i) => i === idx ? { ...g, ...patch } : g));
@@ -619,24 +451,45 @@ function ManualCampaignTab() {
     ]);
   }, [campaignName, adGroups]);
 
+  // File import handler
+  const handleFileImport = useCallback((file: File) => {
+    file.arrayBuffer().then((buffer) => {
+      const wb = XLSX.read(buffer, { type: "array" });
+      const sheetName = wb.SheetNames.find((n) =>
+        ["AD Detail Keywords", "AD Detail ASIN", "AD Detail", "Sheet1", "数据"].includes(n),
+      ) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 }) as unknown[][];
+      const parsed = parseAdDetailRows(raw);
+      setFileRows(parsed); setFileName(file.name);
+      setFileErrors(validateAdDetailRows(parsed, { mode }));
+    });
+  }, [mode]);
+
   const handleGenerate = useCallback(() => {
-    const adDetailRows: AdDetailRow[] = [];
-    for (const group of adGroups) {
-      if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
-      for (const kw of group.keywords) {
-        if (!kw.keyword.trim()) continue;
-        adDetailRows.push({
-          campaignName: campaignName || "Manual Campaign",
-          adGroupName: group.name,
-          budget: parseFloat(budget) || 10,
-          sku: group.sku,
-          asin: group.asin,
-          bid: kw.bid ? parseFloat(kw.bid) : null,
-          keywordText: kw.keyword,
-          matchType: kw.matchType,
-          biddingStrategy,
-          startDate: "",
-        });
+    let adDetailRows: AdDetailRow[];
+
+    if (inputSource === "file") {
+      adDetailRows = fileRows;
+    } else {
+      adDetailRows = [];
+      for (const group of adGroups) {
+        if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
+        for (const kw of group.keywords) {
+          if (!kw.keyword.trim()) continue;
+          adDetailRows.push({
+            campaignName: campaignName || "Manual Campaign",
+            adGroupName: group.name,
+            budget: parseFloat(budget) || 10,
+            sku: group.sku,
+            asin: group.asin,
+            bid: kw.bid ? parseFloat(kw.bid) : null,
+            keywordText: kw.keyword,
+            matchType: kw.matchType,
+            biddingStrategy,
+            startDate: "",
+          });
+        }
       }
     }
 
@@ -645,7 +498,7 @@ function ManualCampaignTab() {
     const opts: BulkSheetOptions = { defaultAdGroupBid: defaultBid, targetingType: "manual", mode };
     const result = generateBulkSheet(adDetailRows, opts);
     setBulkRows(result); setStats(getBulkSheetStats(result)); setGenerated(true);
-  }, [adGroups, campaignName, budget, defaultBid, biddingStrategy, mode]);
+  }, [inputSource, fileRows, adGroups, campaignName, budget, defaultBid, biddingStrategy, mode]);
 
   const handleDownload = useCallback(() => {
     const prefix = mode === "asin" ? "BULK ASIN" : "BULK MANUAL";
@@ -660,10 +513,89 @@ function ManualCampaignTab() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="手动关键词投放" description="直接输入广告活动、广告组和关键词 → 生成可上传的 Bulk Sheet，无需事先准备任何文件" />
+      <PageHeader title="创建 Manual Campaign" description="输入广告信息 → 生成 Amazon Bulk Sheet → 上传到广告后台即可投放" />
 
       {!generated ? (
         <>
+          {/* Input source toggle */}
+          <div className="flex gap-0" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            {([
+              { key: "manual" as const, label: "手动输入" },
+              { key: "file" as const, label: "从 AD Detail 文件导入" },
+            ]).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setInputSource(t.key)}
+                className="px-4 py-2.5 text-sm font-medium transition-colors relative"
+                style={{ color: inputSource === t.key ? "var(--text-primary)" : "var(--text-tertiary)" }}
+              >
+                {t.label}
+                {inputSource === t.key && <div className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full" style={{ background: "var(--border-focus)" }} />}
+              </button>
+            ))}
+          </div>
+
+          {inputSource === "file" ? (
+            /* File import mode */
+            <>
+              {fileRows.length === 0 ? (
+                <Card>
+                  <div className="p-6">
+                    <FileUpload onFile={handleFileImport} label="上传 AD Detail 规划表" hint="包含广告活动名称、广告组、SKU、关键词等列的 Excel 文件" />
+                  </div>
+                  <div className="px-6 pb-4 text-center">
+                    <button className="text-xs underline" style={{ color: "var(--color-info)" }}
+                      onClick={() => {
+                        downloadXlsx([{
+                          name: "AD Detail Keywords",
+                          data: [
+                            ["广告活动名称", "广告组名称", "预算", "SKU", "ASIN", "出价", "关键词", "匹配类型", "竞价策略", "开始日期"],
+                            ["SP_Brand_Exact", "Brand_Exact", 10, "ABC-123", "B0EXAMPLE1", 0.5, "example keyword", "exact", "Dynamic bids - down only", ""],
+                          ],
+                        }], "AD Detail 模板.xlsx");
+                      }}>下载模板文件</button>
+                  </div>
+                </Card>
+              ) : (
+                <>
+                  <Card>
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-lg p-2" style={{ background: "var(--color-success-light)", color: "var(--color-success)" }}>{Icons.file}</div>
+                        <div>
+                          <p className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>{fileName}</p>
+                          <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                            {fileRows.length} 行数据
+                            {fileErrors.length > 0 && <span style={{ color: "var(--color-warning)" }}> · {fileErrors.length} 个警告</span>}
+                          </p>
+                        </div>
+                      </div>
+                      <Btn variant="ghost" size="sm" onClick={() => { setFileRows([]); setFileName(""); }}>
+                        {Icons.refresh} 重新选择
+                      </Btn>
+                    </div>
+                  </Card>
+                  <Card>
+                    <CardHeader title="生成参数" />
+                    <div className="px-5 pb-5 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Select label="投放模式" value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "asin")}>
+                          <option value="keyword">关键词投放 (Keywords)</option>
+                          <option value="asin">商品投放 (ASIN Targeting)</option>
+                        </Select>
+                        <Input label="默认竞价 ($)" type="number" step="0.01" min="0.02" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <Btn variant="primary" onClick={handleGenerate}>{Icons.zap} 生成 Bulk Sheet</Btn>
+                      </div>
+                    </div>
+                  </Card>
+                </>
+              )}
+            </>
+          ) : (
+            /* Manual input mode */
+            <>
           {/* Campaign config */}
           <Card>
             <CardHeader title="广告活动设置" />
@@ -808,6 +740,8 @@ function ManualCampaignTab() {
               </Btn>
             </div>
           </div>
+            </>
+          )}
         </>
       ) : (
         <>
