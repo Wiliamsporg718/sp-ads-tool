@@ -84,13 +84,13 @@ const Icons = {
 // Tab config
 // ---------------------------------------------------------------------------
 
-type Tab = "bulk" | "manual" | "asin" | "auto" | "harvest";
+type Tab = "manual" | "bulk" | "asin" | "auto" | "harvest";
 
 const TAB_CONFIG: { key: Tab; label: string; desc: string }[] = [
-  { key: "bulk", label: "Bulk Sheet", desc: "文件转换" },
   { key: "manual", label: "手动投放", desc: "关键词/ASIN" },
-  { key: "asin", label: "ASIN 组合", desc: "防御组合" },
   { key: "auto", label: "Auto Campaign", desc: "自动广告" },
+  { key: "asin", label: "ASIN 组合", desc: "防御组合" },
+  { key: "bulk", label: "Bulk Sheet", desc: "文件转换" },
   { key: "harvest", label: "搜索词分析", desc: "收割/否定" },
 ];
 
@@ -99,7 +99,7 @@ const TAB_CONFIG: { key: Tab; label: string; desc: string }[] = [
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("bulk");
+  const [tab, setTab] = useState<Tab>("manual");
 
   return (
     <div className="min-h-screen">
@@ -440,7 +440,18 @@ function BulkSheetTab() {
           </Card>
           <div className="text-center">
             <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-              没有 AD Detail 文件？使用 <button className="underline" style={{ color: "var(--color-info)" }} onClick={() => {/* hint only */}}>Auto Campaign</button> 功能可直接手动创建广告
+              没有 AD Detail 文件？
+              <button className="underline ml-1" style={{ color: "var(--color-info)" }}
+                onClick={() => {
+                  downloadXlsx([{
+                    name: "AD Detail Keywords",
+                    data: [
+                      ["广告活动名称", "广告组名称", "预算", "SKU", "ASIN", "出价", "关键词", "匹配类型", "竞价策略", "开始日期"],
+                      ["SP_Brand_Exact", "Brand_Exact", 10, "ABC-123", "B0EXAMPLE1", 0.5, "example keyword", "exact", "Dynamic bids - down only", ""],
+                    ],
+                  }], "AD Detail 模板.xlsx");
+                }}>下载模板文件</button>
+              ，或使用<button className="underline ml-1" style={{ color: "var(--color-info)" }}>手动投放</button>功能直接手动创建
             </p>
           </div>
         </>
@@ -558,6 +569,8 @@ function ManualCampaignTab() {
   const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
   const [stats, setStats] = useState<BulkSheetStats | null>(null);
   const [generated, setGenerated] = useState(false);
+  const [showBatchPaste, setShowBatchPaste] = useState<number | null>(null);
+  const [batchText, setBatchText] = useState("");
 
   const updateAdGroup = useCallback((idx: number, patch: Partial<ManualAdGroup>) => {
     setAdGroups((prev) => prev.map((g, i) => i === idx ? { ...g, ...patch } : g));
@@ -579,8 +592,34 @@ function ManualCampaignTab() {
     } : g));
   }, []);
 
+  // Batch paste: one keyword per line
+  const handleBatchPaste = useCallback((groupIdx: number) => {
+    const lines = batchText.split(/\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+    if (lines.length === 0) return;
+    const newKeywords: ManualKeywordEntry[] = lines.map((l) => ({ keyword: l, matchType: "exact" as const, bid: "" }));
+    setAdGroups((prev) => prev.map((g, i) => i === groupIdx ? {
+      ...g, keywords: [...g.keywords.filter((k) => k.keyword.trim()), ...newKeywords],
+    } : g));
+    setBatchText("");
+    setShowBatchPaste(null);
+  }, [batchText]);
+
+  // Quick template: create 3 ad groups (Exact/Phrase/Broad) with same keywords
+  const handleQuickTemplate = useCallback(() => {
+    const baseName = campaignName || "SP_Manual";
+    const sku = adGroups[0]?.sku || "";
+    const asin = adGroups[0]?.asin || "";
+    const existingKws = adGroups[0]?.keywords.filter((k) => k.keyword.trim()) || [];
+    const templateKws = existingKws.length > 0 ? existingKws : [{ keyword: "", matchType: "exact" as const, bid: "" }];
+
+    setAdGroups([
+      { name: `${baseName}_Exact`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "exact" as const })) },
+      { name: `${baseName}_Phrase`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "phrase" as const })) },
+      { name: `${baseName}_Broad`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "broad" as const })) },
+    ]);
+  }, [campaignName, adGroups]);
+
   const handleGenerate = useCallback(() => {
-    // Convert manual entries → AdDetailRow[]
     const adDetailRows: AdDetailRow[] = [];
     for (const group of adGroups) {
       if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
@@ -646,6 +685,16 @@ function ManualCampaignTab() {
             </div>
           </Card>
 
+          {/* Quick actions */}
+          <div className="flex gap-2 flex-wrap">
+            <Btn variant="outline" size="sm" onClick={handleQuickTemplate}>
+              {Icons.zap} 快速模板：3 匹配类型
+            </Btn>
+            <span className="text-xs self-center" style={{ color: "var(--text-tertiary)" }}>
+              一键创建 Exact + Phrase + Broad 三个广告组
+            </span>
+          </div>
+
           {/* Ad Groups */}
           {adGroups.map((group, gi) => (
             <Card key={gi}>
@@ -675,8 +724,36 @@ function ManualCampaignTab() {
                     <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                       {mode === "keyword" ? "关键词" : "投放 ASIN"}
                     </label>
-                    <Btn variant="outline" size="sm" onClick={() => addKeyword(gi)}>{Icons.plus} 添加</Btn>
+                    <div className="flex gap-1">
+                      <Btn variant="ghost" size="sm" onClick={() => { setShowBatchPaste(showBatchPaste === gi ? null : gi); setBatchText(""); }}>
+                        批量粘贴
+                      </Btn>
+                      <Btn variant="outline" size="sm" onClick={() => addKeyword(gi)}>{Icons.plus} 添加</Btn>
+                    </div>
                   </div>
+
+                  {/* Batch paste area */}
+                  {showBatchPaste === gi && (
+                    <div className="mb-3 p-3 rounded-lg" style={{ background: "var(--surface-muted)", border: "1px solid var(--border-default)" }}>
+                      <textarea
+                        rows={5}
+                        className="w-full px-3 py-2 text-sm rounded-md mb-2 resize-none"
+                        style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
+                        placeholder={"每行一个关键词，例如：\nwireless headphones\nbluetooth earbuds\nnoise cancelling"}
+                        value={batchText}
+                        onChange={(e) => setBatchText(e.target.value)}
+                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                          {batchText.split(/\n/).filter((l) => l.trim()).length} 个关键词
+                        </span>
+                        <div className="flex gap-2">
+                          <Btn variant="ghost" size="sm" onClick={() => setShowBatchPaste(null)}>取消</Btn>
+                          <Btn variant="primary" size="sm" onClick={() => handleBatchPaste(gi)}>添加全部</Btn>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {group.keywords.map((kw, ki) => (
                       <div key={ki} className="flex gap-2 items-center group">
