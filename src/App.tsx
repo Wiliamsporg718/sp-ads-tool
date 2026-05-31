@@ -34,16 +34,63 @@ import {
 } from "./lib/search-term-harvester";
 
 // ---------------------------------------------------------------------------
+// SVG Icons (inline, no external dependency)
+// ---------------------------------------------------------------------------
+
+const Icons = {
+  upload: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  ),
+  download: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  ),
+  zap: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  ),
+  plus: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  x: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
+  check: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  refresh: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  ),
+  file: (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+    </svg>
+  ),
+};
+
+// ---------------------------------------------------------------------------
 // Tab config
 // ---------------------------------------------------------------------------
 
 type Tab = "bulk" | "asin" | "auto" | "harvest";
 
-const TAB_CONFIG: { key: Tab; label: string; icon: string }[] = [
-  { key: "bulk", label: "Bulk Sheet 生成", icon: "📋" },
-  { key: "asin", label: "ASIN 数据准备", icon: "🔗" },
-  { key: "auto", label: "Auto Campaign", icon: "🤖" },
-  { key: "harvest", label: "搜索词收割", icon: "🔍" },
+const TAB_CONFIG: { key: Tab; label: string; desc: string }[] = [
+  { key: "bulk", label: "Bulk Sheet", desc: "批量广告表" },
+  { key: "asin", label: "ASIN 组合", desc: "防御组合" },
+  { key: "auto", label: "Auto Campaign", desc: "自动广告" },
+  { key: "harvest", label: "搜索词分析", desc: "收割/否定" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -54,52 +101,164 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("bulk");
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">SP 广告投放工具</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Amazon Sponsored Products 批量广告创建 · 搜索词优化 · 全流程自动化
-        </p>
-      </div>
+    <div className="min-h-screen">
+      {/* Header */}
+      <header className="sticky top-0 z-50" style={{ background: "var(--brand-dark)" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-14 gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-md flex items-center justify-center text-sm font-bold" style={{ background: "var(--brand-primary)", color: "#fff" }}>SP</div>
+            <h1 className="text-white text-base font-semibold tracking-tight hidden sm:block">SP Ads Tool</h1>
+          </div>
+          <nav className="flex gap-1 ml-6">
+            {TAB_CONFIG.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150"
+                style={{
+                  color: tab === t.key ? "#fff" : "rgba(255,255,255,0.6)",
+                  background: tab === t.key ? "rgba(255,255,255,0.12)" : "transparent",
+                }}
+                onMouseEnter={(e) => { if (tab !== t.key) (e.target as HTMLElement).style.color = "rgba(255,255,255,0.85)"; }}
+                onMouseLeave={(e) => { if (tab !== t.key) (e.target as HTMLElement).style.color = "rgba(255,255,255,0.6)"; }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
 
-      <div className="flex gap-1 mb-6 p-1 bg-gray-100 rounded-lg w-fit flex-wrap">
-        {TAB_CONFIG.map((t) => (
-          <button
-            key={t.key}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              tab === t.key
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-            onClick={() => setTab(t.key)}
-          >
-            <span className="mr-1">{t.icon}</span>{t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "bulk" && <BulkSheetTab />}
-      {tab === "asin" && <AsinPrepTab />}
-      {tab === "auto" && <AutoCampaignTab />}
-      {tab === "harvest" && <SearchTermHarvesterTab />}
+      {/* Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <div className="animate-fadeIn">
+          {tab === "bulk" && <BulkSheetTab />}
+          {tab === "asin" && <AsinPrepTab />}
+          {tab === "auto" && <AutoCampaignTab />}
+          {tab === "harvest" && <SearchTermHarvesterTab />}
+        </div>
+      </main>
     </div>
   );
 }
 
 // ===========================================================================
-// Shared UI
+// Shared UI Components — Amazon Design System
 // ===========================================================================
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`bg-white border border-gray-200 rounded-lg ${className}`}>{children}</div>;
+  return (
+    <div
+      className={`rounded-xl transition-shadow duration-200 ${className}`}
+      style={{
+        background: "var(--surface-card)",
+        border: "1px solid var(--border-default)",
+        boxShadow: "var(--shadow-sm)",
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
-function StatCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
+function CardHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <Card className="p-4 text-center">
-      <p className={`text-2xl font-bold ${color || "text-gray-900"}`}>{value}</p>
-      <p className="text-xs text-gray-500">{label}</p>
+    <div className="p-5 flex items-start justify-between">
+      <div>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>{title}</h2>
+        {description && <p className="text-sm mt-0.5" style={{ color: "var(--text-tertiary)" }}>{description}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function StatCard({ label, value, color, icon }: { label: string; value: number | string; color?: string; icon?: React.ReactNode }) {
+  return (
+    <Card className="p-4 hover:shadow-[var(--shadow-md)]">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{label}</span>
+        {icon && <span style={{ color: color || "var(--text-tertiary)" }}>{icon}</span>}
+      </div>
+      <p className="text-2xl font-bold" style={{ color: color || "var(--text-primary)" }}>{value}</p>
     </Card>
+  );
+}
+
+function Btn({ children, variant = "primary", size = "md", disabled, onClick, className = "" }: {
+  children: React.ReactNode; variant?: "primary" | "amazon" | "outline" | "ghost" | "danger";
+  size?: "sm" | "md" | "lg"; disabled?: boolean; onClick?: () => void; className?: string;
+}) {
+  const base = "inline-flex items-center justify-center gap-1.5 font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none";
+  const sizes = { sm: "px-3 py-1.5 text-xs rounded-md", md: "px-4 py-2 text-sm rounded-lg", lg: "px-6 py-2.5 text-sm rounded-lg" };
+  const variants: Record<string, string> = {
+    primary: "",
+    amazon: "",
+    outline: "",
+    ghost: "",
+    danger: "",
+  };
+  const variantStyles: Record<string, React.CSSProperties> = {
+    primary: { background: "var(--brand-primary)", color: "#fff" },
+    amazon: { background: "var(--brand-dark)", color: "#fff" },
+    outline: { background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border-default)" },
+    ghost: { background: "transparent", color: "var(--text-secondary)" },
+    danger: { background: "var(--color-danger)", color: "#fff" },
+  };
+
+  return (
+    <button
+      className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
+      style={variantStyles[variant]}
+      disabled={disabled}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget;
+        if (variant === "primary") el.style.background = "var(--brand-primary-hover)";
+        else if (variant === "amazon") el.style.background = "var(--brand-dark-hover)";
+        else if (variant === "outline" || variant === "ghost") el.style.background = "var(--surface-hover)";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        el.style.background = variantStyles[variant].background as string;
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Input({ label, hint, ...props }: { label?: string; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div>
+      {label && <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-primary)" }}>{label}</label>}
+      <input
+        {...props}
+        className="w-full h-9 px-3 text-sm rounded-md transition-all duration-150 focus:ring-2 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)]"
+        style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)", boxShadow: "var(--shadow-xs)", color: "var(--text-primary)" }}
+      />
+      {hint && <p className="mt-1 text-xs" style={{ color: "var(--text-tertiary)" }}>{hint}</p>}
+    </div>
+  );
+}
+
+function Select({ label, children, ...props }: { label?: string } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <div>
+      {label && <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-primary)" }}>{label}</label>}
+      <select
+        {...props}
+        className="w-full h-9 px-3 text-sm rounded-md transition-all duration-150 appearance-none bg-no-repeat bg-right pr-8"
+        style={{
+          border: "1px solid var(--border-default)", background: "var(--surface-card)", boxShadow: "var(--shadow-xs)",
+          color: "var(--text-primary)",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+          backgroundPosition: "right 8px center",
+        }}
+      >
+        {children}
+      </select>
+    </div>
   );
 }
 
@@ -111,22 +270,27 @@ function FileUpload({ onFile, accept = ".xlsx,.xls,.xlsm", label, hint }: {
   return (
     <div
       role="button" tabIndex={0}
-      className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 cursor-pointer transition-all ${
-        isDragOver ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
-      }`}
+      className="flex flex-col items-center justify-center gap-3 rounded-xl p-12 cursor-pointer transition-all duration-200"
+      style={{
+        border: `2px dashed ${isDragOver ? "var(--brand-primary)" : "var(--border-strong)"}`,
+        background: isDragOver ? "var(--brand-primary-light)" : "var(--surface-muted)",
+      }}
       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
       onDragLeave={(e) => { e.preventDefault(); setIsDragOver(false); }}
       onDrop={(e) => { e.preventDefault(); setIsDragOver(false); const f = e.dataTransfer.files[0]; if (f) onFile(f); }}
       onClick={() => inputRef.current?.click()}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
     >
-      <span className="text-3xl">📂</span>
-      <p className="font-medium text-gray-700">{label}</p>
-      <p className="text-sm text-gray-500">{hint}</p>
-      <button className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
-        onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
+      <div className="rounded-full p-3" style={{ background: "var(--color-info-light)", color: "var(--color-info)" }}>
+        {Icons.upload}
+      </div>
+      <div className="text-center">
+        <p className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>{label}</p>
+        <p className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>{hint}</p>
+      </div>
+      <Btn variant="outline" size="sm" onClick={() => { inputRef.current?.click(); }}>
         选择文件
-      </button>
+      </Btn>
       <input ref={inputRef} type="file" accept={accept} className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); if (inputRef.current) inputRef.current.value = ""; }} />
     </div>
@@ -134,20 +298,61 @@ function FileUpload({ onFile, accept = ".xlsx,.xls,.xlsm", label, hint }: {
 }
 
 function EntityBadge({ entity }: { entity: string }) {
-  const colors: Record<string, string> = {
-    Campaign: "bg-blue-100 text-blue-800",
-    "Bidding adjustment": "bg-amber-100 text-amber-800",
-    "Ad group": "bg-green-100 text-green-800",
-    "Product ad": "bg-purple-100 text-purple-800",
-    keyword: "bg-cyan-100 text-cyan-800",
-    "Product targeting": "bg-indigo-100 text-indigo-800",
-    "negative keyword": "bg-red-100 text-red-800",
-    "negative product targeting": "bg-red-100 text-red-800",
+  const styles: Record<string, { bg: string; fg: string }> = {
+    Campaign: { bg: "var(--color-info-light)", fg: "var(--color-info-text)" },
+    "Bidding adjustment": { bg: "var(--color-warning-light)", fg: "var(--color-warning-text)" },
+    "Ad group": { bg: "var(--color-success-light)", fg: "var(--color-success-text)" },
+    "Product ad": { bg: "var(--color-purple-light)", fg: "var(--color-purple)" },
+    keyword: { bg: "var(--color-info-light)", fg: "var(--color-info-text)" },
+    "Product targeting": { bg: "var(--color-purple-light)", fg: "var(--color-purple)" },
+    "negative keyword": { bg: "var(--color-danger-light)", fg: "var(--color-danger-text)" },
+    "negative product targeting": { bg: "var(--color-danger-light)", fg: "var(--color-danger-text)" },
   };
+  const s = styles[entity] || { bg: "var(--surface-muted)", fg: "var(--text-secondary)" };
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${colors[entity] || "bg-gray-100 text-gray-800"}`}>
+    <span
+      className="inline-block px-2 py-0.5 rounded text-[10px] font-medium"
+      style={{ background: s.bg, color: s.fg }}
+    >
       {entity}
     </span>
+  );
+}
+
+function Badge({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "success" | "warning" | "danger" }) {
+  const colors = {
+    default: { bg: "var(--surface-muted)", fg: "var(--text-secondary)" },
+    success: { bg: "var(--color-success-light)", fg: "var(--color-success-text)" },
+    warning: { bg: "var(--color-warning-light)", fg: "var(--color-warning-text)" },
+    danger: { bg: "var(--color-danger-light)", fg: "var(--color-danger-text)" },
+  };
+  const c = colors[variant];
+  return <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium" style={{ background: c.bg, color: c.fg }}>{children}</span>;
+}
+
+function PageHeader({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="mb-6">
+      <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>{title}</h2>
+      <p className="text-sm mt-1" style={{ color: "var(--text-tertiary)" }}>{description}</p>
+    </div>
+  );
+}
+
+function DataTable({ headers, children, maxHeight = "320px" }: { headers: { label: string; align?: "left" | "right" }[]; children: React.ReactNode; maxHeight?: string }) {
+  return (
+    <div className="overflow-x-auto rounded-lg" style={{ maxHeight, border: "1px solid var(--border-default)" }}>
+      <table className="w-full text-xs">
+        <thead className="sticky top-0" style={{ background: "var(--surface-muted)" }}>
+          <tr>
+            {headers.map((h, i) => (
+              <th key={i} className={`p-2.5 font-semibold ${h.align === "right" ? "text-right" : "text-left"}`} style={{ color: "var(--text-secondary)", borderBottom: "1px solid var(--border-default)" }}>{h.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
   );
 }
 
@@ -205,54 +410,49 @@ function BulkSheetTab() {
   }, [bulkRows, mode]);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Bulk Sheet 生成器</h2>
-        <p className="text-sm text-gray-500">上传 AD Detail → 一键生成 Amazon SP Bulk Sheet</p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader title="Bulk Sheet 生成器" description="上传 AD Detail 表格 → 一键生成 Amazon SP Bulk Upload 文件" />
 
       {step === "upload" && (
-        <Card className="p-6">
-          <FileUpload onFile={handleFile} label="拖拽 AD Detail 文件到此处" hint="支持 .xlsx / .xls / .xlsm" />
+        <Card>
+          <div className="p-6">
+            <FileUpload onFile={handleFile} label="拖拽 AD Detail 文件到此处" hint="支持 .xlsx / .xls / .xlsm 格式" />
+          </div>
         </Card>
       )}
 
       {step === "config" && (
         <>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">{fileName}</p>
-                <p className="text-sm text-gray-500">
-                  {rows.length} 行数据
-                  {errors.length > 0 && <span className="text-amber-600 ml-2">· {errors.length} 个警告</span>}
-                </p>
+          <Card>
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg p-2" style={{ background: "var(--color-success-light)", color: "var(--color-success)" }}>{Icons.file}</div>
+                <div>
+                  <p className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>{fileName}</p>
+                  <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {rows.length} 行数据
+                    {errors.length > 0 && <span style={{ color: "var(--color-warning)" }}> · {errors.length} 个警告</span>}
+                  </p>
+                </div>
               </div>
-              <button className="text-sm text-gray-500 hover:text-gray-700"
-                onClick={() => { setStep("upload"); setRows([]); }}>重新选择</button>
+              <Btn variant="ghost" size="sm" onClick={() => { setStep("upload"); setRows([]); }}>
+                {Icons.refresh} 重新选择
+              </Btn>
             </div>
           </Card>
-          <Card className="p-6 space-y-4">
-            <h3 className="font-semibold">参数配置</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">投放模式</label>
-                <select className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "asin")}>
-                  <option value="keyword">关键词投放</option>
-                  <option value="asin">商品投放 (ASIN)</option>
-                </select>
+          <Card>
+            <CardHeader title="参数配置" />
+            <div className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select label="投放模式" value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "asin")}>
+                  <option value="keyword">关键词投放 (Keywords)</option>
+                  <option value="asin">商品投放 (ASIN Targeting)</option>
+                </Select>
+                <Input label="默认竞价 ($)" type="number" step="0.01" min="0.02" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">默认竞价 ($)</label>
-                <input type="number" step="0.01" min="0.02"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  value={defaultBid} onChange={(e) => setDefaultBid(e.target.value)} />
+              <div className="flex justify-end pt-2">
+                <Btn variant="primary" onClick={handleGenerate}>{Icons.zap} 生成 Bulk Sheet</Btn>
               </div>
-            </div>
-            <div className="flex justify-end">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
-                onClick={handleGenerate}>⚡ 生成 Bulk Sheet</button>
             </div>
           </Card>
         </>
@@ -260,49 +460,42 @@ function BulkSheetTab() {
 
       {step === "result" && stats && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="广告活动" value={stats.campaignCount} />
             <StatCard label="广告组" value={stats.adGroupCount} />
             <StatCard label="商品广告" value={stats.productAdCount} />
-            <StatCard label="总行数" value={stats.totalRows} color="text-green-600" />
-            {stats.keywordCount > 0 && <StatCard label="关键词" value={stats.keywordCount} />}
-            {stats.productTargetingCount > 0 && <StatCard label="商品投放" value={stats.productTargetingCount} />}
+            <StatCard label="总行数" value={stats.totalRows} color="var(--color-success)" />
+            {stats.keywordCount > 0 && <StatCard label="关键词" value={stats.keywordCount} color="var(--color-info)" />}
+            {stats.productTargetingCount > 0 && <StatCard label="商品投放" value={stats.productTargetingCount} color="var(--color-purple)" />}
           </div>
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-medium text-green-700">✅ 生成完成</span>
+          <Card>
+            <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
+              <div className="flex items-center gap-2">
+                <span style={{ color: "var(--color-success)" }}>{Icons.check}</span>
+                <span className="font-medium text-sm" style={{ color: "var(--color-success)" }}>生成完成</span>
+              </div>
               <div className="flex gap-2">
-                <button className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
-                  onClick={() => { setStep("upload"); setRows([]); setBulkRows([]); setStats(null); }}>重新开始</button>
-                <button className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  onClick={handleDownload}>📥 下载 XLSX</button>
+                <Btn variant="ghost" size="sm" onClick={() => { setStep("upload"); setRows([]); setBulkRows([]); setStats(null); }}>
+                  {Icons.refresh} 重新开始
+                </Btn>
+                <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 下载 XLSX</Btn>
               </div>
             </div>
-            <div className="overflow-x-auto max-h-80">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b">
-                    <th className="p-1.5 text-left">#</th>
-                    <th className="p-1.5 text-left">Entity</th>
-                    <th className="p-1.5 text-left">Campaign</th>
-                    <th className="p-1.5 text-left">Ad Group</th>
-                    <th className="p-1.5 text-left">SKU</th>
-                    <th className="p-1.5 text-left">Keyword/ASIN</th>
+            <div className="p-4">
+              <DataTable headers={[
+                { label: "#" }, { label: "Entity" }, { label: "Campaign" }, { label: "Ad Group" }, { label: "SKU" }, { label: "Keyword / ASIN" },
+              ]}>
+                {bulkRows.slice(0, 50).map((row, idx) => (
+                  <tr key={idx} className="hover:bg-[var(--surface-hover)]" style={{ borderBottom: "1px solid var(--border-default)" }}>
+                    <td className="p-2.5 text-xs" style={{ color: "var(--text-tertiary)" }}>{idx + 1}</td>
+                    <td className="p-2.5"><EntityBadge entity={row.entity} /></td>
+                    <td className="p-2.5 text-xs max-w-[180px] truncate">{row.campaignNameInfo}</td>
+                    <td className="p-2.5 text-xs max-w-[140px] truncate">{row.adGroupNameInfo}</td>
+                    <td className="p-2.5 text-xs font-mono">{row.sku}</td>
+                    <td className="p-2.5 text-xs max-w-[140px] truncate">{row.keywordText || row.productTargetingExpression}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {bulkRows.slice(0, 50).map((row, idx) => (
-                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="p-1.5 text-gray-400">{idx + 1}</td>
-                      <td className="p-1.5"><EntityBadge entity={row.entity} /></td>
-                      <td className="p-1.5 max-w-[150px] truncate">{row.campaignNameInfo}</td>
-                      <td className="p-1.5 max-w-[120px] truncate">{row.adGroupNameInfo}</td>
-                      <td className="p-1.5 font-mono">{row.sku}</td>
-                      <td className="p-1.5 max-w-[120px] truncate">{row.keywordText || row.productTargetingExpression}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </DataTable>
             </div>
           </Card>
         </>
@@ -351,46 +544,51 @@ function AsinPrepTab() {
   const expectedCombos = products.length * (products.length - 1);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">ASIN 数据准备</h2>
-        <p className="text-sm text-gray-500">上传 ASIN 列表 → 生成 N×(N-1) 防御组合</p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader title="ASIN 数据准备" description="上传 ASIN 列表 → 自动生成 N × (N-1) 防御性商品投放组合" />
+
       {products.length === 0 ? (
-        <Card className="p-6">
-          <FileUpload onFile={handleFile} label="上传 ASIN Data 文件" hint="需包含 SKU 和 ASIN 列" />
+        <Card>
+          <div className="p-6">
+            <FileUpload onFile={handleFile} label="上传 ASIN Data 文件" hint="需包含 SKU 和 ASIN 列" />
+          </div>
         </Card>
       ) : (
         <>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">{fileName} — {products.length} 个商品</p>
-                {products.length > 1 && <p className="text-sm text-gray-500">预计 {expectedCombos} 个组合</p>}
+          <Card>
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg p-2" style={{ background: "var(--color-info-light)", color: "var(--color-info)" }}>{Icons.file}</div>
+                <div>
+                  <p className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>{fileName}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Badge variant="success">{products.length} 个商品</Badge>
+                    {products.length > 1 && <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>预计 {expectedCombos} 个组合</span>}
+                  </div>
+                </div>
               </div>
-              <button className="text-sm text-gray-500" onClick={() => { setProducts([]); setGenerated(false); }}>重新选择</button>
+              <Btn variant="ghost" size="sm" onClick={() => { setProducts([]); setGenerated(false); }}>
+                {Icons.refresh} 重新选择
+              </Btn>
             </div>
           </Card>
-          <Card className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">预算 ($)</label>
-                <input type="number" step="0.01" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={budget} onChange={(e) => setBudget(e.target.value)} />
+          <Card>
+            <CardHeader title="组合参数" />
+            <div className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="预算 ($)" type="number" step="0.01" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBudget(e.target.value)} />
+                <Input label="竞价 ($)" type="number" step="0.01" value={bid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBid(e.target.value)} />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">竞价 ($)</label>
-                <input type="number" step="0.01" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={bid} onChange={(e) => setBid(e.target.value)} />
+              <div className="flex justify-end gap-2 pt-2">
+                {!generated ? (
+                  <Btn variant="primary" onClick={handleGenerate}>{Icons.zap} 生成组合</Btn>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Badge variant="success">{combinations.length} 个组合已生成</Badge>
+                    <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 下载 XLSX</Btn>
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              {!generated ? (
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700" onClick={handleGenerate}>🔗 生成组合</button>
-              ) : (
-                <>
-                  <span className="text-sm text-green-600">✅ {combinations.length} 个组合</span>
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700" onClick={handleDownload}>📥 下载</button>
-                </>
-              )}
             </div>
           </Card>
         </>
@@ -430,100 +628,93 @@ function AutoCampaignTab() {
   }, [bulkRows]);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Auto Campaign 生成器</h2>
-        <p className="text-sm text-gray-500">一键创建 SP 自动广告（4 种匹配组）</p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader title="Auto Campaign 生成器" description="一键创建 SP 自动广告活动（Close Match / Loose Match / Substitutes / Complements）" />
 
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">商品列表</h3>
-          <button className="px-2 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
-            onClick={() => setProducts((p) => [...p, { sku: "", asin: "" }])}>+ 添加</button>
-        </div>
-        <div className="space-y-2">
+      <Card>
+        <CardHeader
+          title="商品列表"
+          action={
+            <Btn variant="outline" size="sm" onClick={() => setProducts((p) => [...p, { sku: "", asin: "" }])}>
+              {Icons.plus} 添加商品
+            </Btn>
+          }
+        />
+        <div className="px-5 pb-5 space-y-2">
           {products.map((p, idx) => (
-            <div key={idx} className="flex gap-2 items-center">
-              <span className="text-xs text-gray-400 w-5 text-right">{idx + 1}</span>
-              <input placeholder="SKU" className="flex-1 border border-gray-300 rounded-md px-2 py-1.5 text-sm font-mono"
+            <div key={idx} className="flex gap-2 items-center group">
+              <span className="text-xs w-6 text-right font-mono" style={{ color: "var(--text-tertiary)" }}>{idx + 1}.</span>
+              <input placeholder="SKU"
+                className="flex-1 h-9 px-3 text-sm font-mono rounded-md transition-all"
+                style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
                 value={p.sku} onChange={(e) => setProducts((prev) => prev.map((pr, i) => i === idx ? { ...pr, sku: e.target.value } : pr))} />
-              <input placeholder="ASIN" className="flex-1 border border-gray-300 rounded-md px-2 py-1.5 text-sm font-mono"
+              <input placeholder="ASIN (B0XXXXXXXXX)"
+                className="flex-1 h-9 px-3 text-sm font-mono rounded-md transition-all"
+                style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
                 value={p.asin} onChange={(e) => setProducts((prev) => prev.map((pr, i) => i === idx ? { ...pr, asin: e.target.value } : pr))} />
               {products.length > 1 && (
-                <button className="text-red-400 hover:text-red-600 text-sm"
-                  onClick={() => setProducts((prev) => prev.filter((_, i) => i !== idx))}>✕</button>
+                <button className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: "var(--color-danger)" }}
+                  onClick={() => setProducts((prev) => prev.filter((_, i) => i !== idx))}
+                >{Icons.x}</button>
               )}
             </div>
           ))}
         </div>
       </Card>
 
-      <Card className="p-6 space-y-4">
-        <h3 className="font-semibold">广告配置</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">品牌</label>
-            <input className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. AGU" />
+      <Card>
+        <CardHeader title="广告配置" />
+        <div className="px-5 pb-5 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Input label="品牌" placeholder="e.g. AGU" value={brand} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBrand(e.target.value)} />
+            <Input label="品类" placeholder="e.g. Jersey" value={category} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCategory(e.target.value)} />
+            <Input label="日预算 ($)" type="number" step="0.01" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBudget(e.target.value)} />
+            <Input label="默认竞价 ($)" type="number" step="0.01" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
+            <Select label="结构" value={structure} onChange={(e) => setStructure(e.target.value as "per-product" | "single")}>
+              <option value="per-product">每商品独立广告活动</option>
+              <option value="single">合并为单个广告活动</option>
+            </Select>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">品类</label>
-            <input className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Jersey" />
+          <div className="flex justify-end pt-2">
+            <Btn variant="primary" disabled={validProducts.length === 0 || !brand || !category} onClick={handleGenerate}>
+              {Icons.zap} 生成 Auto Campaign
+            </Btn>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">日预算 ($)</label>
-            <input type="number" step="0.01" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={budget} onChange={(e) => setBudget(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">默认竞价 ($)</label>
-            <input type="number" step="0.01" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={defaultBid} onChange={(e) => setDefaultBid(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">结构</label>
-            <select className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={structure} onChange={(e) => setStructure(e.target.value as "per-product" | "single")}>
-              <option value="per-product">每商品一个广告活动</option>
-              <option value="single">合并为一个广告活动</option>
-            </select>
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            disabled={validProducts.length === 0 || !brand || !category} onClick={handleGenerate}>🤖 生成 Auto Campaign</button>
         </div>
       </Card>
 
       {generated && stats && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <StatCard label="广告活动" value={stats.campaignCount} />
             <StatCard label="广告组" value={stats.adGroupCount} />
             <StatCard label="商品广告" value={stats.productAdCount} />
-            <StatCard label="竞价调整" value={stats.biddingAdjustmentCount} />
-            <StatCard label="总行数" value={stats.totalRows} color="text-green-600" />
+            <StatCard label="竞价调整" value={stats.biddingAdjustmentCount} color="var(--color-warning)" />
+            <StatCard label="总行数" value={stats.totalRows} color="var(--color-success)" />
           </div>
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-green-700 font-medium">✅ 生成完成</span>
-              <button className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700" onClick={handleDownload}>📥 下载 XLSX</button>
+          <Card>
+            <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
+              <div className="flex items-center gap-2">
+                <span style={{ color: "var(--color-success)" }}>{Icons.check}</span>
+                <span className="font-medium text-sm" style={{ color: "var(--color-success)" }}>生成完成</span>
+              </div>
+              <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 下载 XLSX</Btn>
             </div>
-            <div className="overflow-x-auto max-h-72">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-white"><tr className="border-b">
-                  <th className="p-1.5 text-left">#</th><th className="p-1.5 text-left">Entity</th>
-                  <th className="p-1.5 text-left">Campaign</th><th className="p-1.5 text-left">Ad Group</th><th className="p-1.5 text-left">SKU</th>
-                </tr></thead>
-                <tbody>
-                  {bulkRows.slice(0, 40).map((row, idx) => (
-                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="p-1.5 text-gray-400">{idx + 1}</td>
-                      <td className="p-1.5"><EntityBadge entity={row.entity} /></td>
-                      <td className="p-1.5 max-w-[180px] truncate">{row.campaignNameInfo}</td>
-                      <td className="p-1.5 max-w-[180px] truncate">{row.adGroupNameInfo}</td>
-                      <td className="p-1.5 font-mono">{row.sku}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-4">
+              <DataTable headers={[
+                { label: "#" }, { label: "Entity" }, { label: "Campaign" }, { label: "Ad Group" }, { label: "SKU" },
+              ]}>
+                {bulkRows.slice(0, 40).map((row, idx) => (
+                  <tr key={idx} className="hover:bg-[var(--surface-hover)]" style={{ borderBottom: "1px solid var(--border-default)" }}>
+                    <td className="p-2.5 text-xs" style={{ color: "var(--text-tertiary)" }}>{idx + 1}</td>
+                    <td className="p-2.5"><EntityBadge entity={row.entity} /></td>
+                    <td className="p-2.5 text-xs max-w-[200px] truncate">{row.campaignNameInfo}</td>
+                    <td className="p-2.5 text-xs max-w-[200px] truncate">{row.adGroupNameInfo}</td>
+                    <td className="p-2.5 text-xs font-mono">{row.sku}</td>
+                  </tr>
+                ))}
+              </DataTable>
             </div>
           </Card>
         </>
@@ -583,33 +774,41 @@ function SearchTermHarvesterTab() {
   }, [result]);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">搜索词收割分析</h2>
-        <p className="text-sm text-gray-500">分析高效词（→ Manual Exact）和低效词（→ 否定）</p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader title="搜索词收割分析" description="分析高效搜索词（→ Manual Exact 投放）和低效词（→ 否定关键词）" />
 
       {rows.length === 0 && (
-        <Card className="p-6">
-          <FileUpload onFile={handleFile} accept=".xlsx,.xls,.csv,.xlsm" label="上传 Search Term Report" hint="Amazon 后台导出的搜索词报告" />
+        <Card>
+          <div className="p-6">
+            <FileUpload onFile={handleFile} accept=".xlsx,.xls,.csv,.xlsm" label="上传 Search Term Report" hint="Amazon 后台导出的搜索词报告" />
+          </div>
         </Card>
       )}
 
       {rows.length > 0 && !result && (
         <>
-          <Card className="p-4"><p className="font-medium">{fileName} — {rows.length} 条记录</p></Card>
-          <Card className="p-6 space-y-4">
-            <h3 className="font-semibold">分析阈值</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div><label className="block text-xs text-gray-500 mb-1">最低点击数</label>
-                <input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={minClicks} onChange={(e) => setMinClicks(e.target.value)} /></div>
-              <div><label className="block text-xs text-gray-500 mb-1">最大 ACOS (%)</label>
-                <input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={maxAcos} onChange={(e) => setMaxAcos(e.target.value)} /></div>
-              <div><label className="block text-xs text-gray-500 mb-1">否定最低点击</label>
-                <input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" value={negMinClicks} onChange={(e) => setNegMinClicks(e.target.value)} /></div>
+          <Card>
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg p-2" style={{ background: "var(--color-info-light)", color: "var(--color-info)" }}>{Icons.file}</div>
+                <div>
+                  <p className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>{fileName}</p>
+                  <Badge variant="success">{rows.length} 条记录</Badge>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-end">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700" onClick={handleAnalyze}>🔍 开始分析</button>
+          </Card>
+          <Card>
+            <CardHeader title="分析阈值" description="调整参数控制收割和否定的灵敏度" />
+            <div className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <Input label="最低点击数" type="number" hint="收割候选最少需要的点击量" value={minClicks} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMinClicks(e.target.value)} />
+                <Input label="最大 ACOS (%)" type="number" hint="低于此 ACOS 视为高效" value={maxAcos} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxAcos(e.target.value)} />
+                <Input label="否定最低点击" type="number" hint="否定候选最少需要的点击量" value={negMinClicks} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNegMinClicks(e.target.value)} />
+              </div>
+              <div className="flex justify-end pt-2">
+                <Btn variant="primary" onClick={handleAnalyze}>{Icons.zap} 开始分析</Btn>
+              </div>
             </div>
           </Card>
         </>
@@ -617,86 +816,83 @@ function SearchTermHarvesterTab() {
 
       {result && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="分析词数" value={result.stats.totalTermsAnalyzed} />
-            <StatCard label="收割候选" value={result.stats.harvestCount} color="text-green-600" />
-            <StatCard label="否定候选" value={result.stats.negativeCount} color="text-red-600" />
-            <StatCard label="预计节省" value={`$${result.stats.estimatedSavings.toFixed(2)}`} color="text-amber-600" />
+            <StatCard label="收割候选" value={result.stats.harvestCount} color="var(--color-success)" />
+            <StatCard label="否定候选" value={result.stats.negativeCount} color="var(--color-danger)" />
+            <StatCard label="预计节省" value={`$${result.stats.estimatedSavings.toFixed(2)}`} color="var(--brand-primary)" />
           </div>
 
-          <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
-            <button className={`px-3 py-1.5 rounded-md text-sm font-medium ${subTab === "harvest" ? "bg-white text-green-700 shadow-sm" : "text-gray-500"}`} onClick={() => setSubTab("harvest")}>
-              📈 收割 ({result.harvestCandidates.length})
-            </button>
-            <button className={`px-3 py-1.5 rounded-md text-sm font-medium ${subTab === "negative" ? "bg-white text-red-700 shadow-sm" : "text-gray-500"}`} onClick={() => setSubTab("negative")}>
-              🚫 否定 ({result.negativeCandidates.length})
-            </button>
+          {/* Sub-tabs */}
+          <div className="flex gap-0" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            {([
+              { key: "harvest" as const, label: "收割候选", count: result.harvestCandidates.length, color: "var(--color-success)" },
+              { key: "negative" as const, label: "否定候选", count: result.negativeCandidates.length, color: "var(--color-danger)" },
+            ]).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setSubTab(t.key)}
+                className="px-4 py-2.5 text-sm font-medium transition-colors relative"
+                style={{ color: subTab === t.key ? "var(--text-primary)" : "var(--text-tertiary)" }}
+              >
+                {t.label} <span className="ml-1 text-xs" style={{ color: t.color }}>({t.count})</span>
+                {subTab === t.key && <div className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full" style={{ background: "var(--border-focus)" }} />}
+              </button>
+            ))}
           </div>
 
           {subTab === "harvest" && (
-            <Card className="p-4">
-              <div className="flex justify-end mb-2">
-                <button className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700" onClick={handleDownload}>📥 导出</button>
+            <Card>
+              <div className="p-4 flex justify-between items-center" style={{ borderBottom: "1px solid var(--border-default)" }}>
+                <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>高效搜索词 — 建议添加到 Manual Exact</span>
+                <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 导出分析</Btn>
               </div>
-              <div className="overflow-x-auto max-h-80">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white"><tr className="border-b">
-                    <th className="p-1.5 text-left">#</th><th className="p-1.5 text-left">搜索词</th>
-                    <th className="p-1.5 text-right">点击</th><th className="p-1.5 text-right">订单</th>
-                    <th className="p-1.5 text-right">ACOS</th><th className="p-1.5 text-right">建议竞价</th>
-                  </tr></thead>
-                  <tbody>
-                    {result.harvestCandidates.slice(0, 100).map((c, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 hover:bg-green-50">
-                        <td className="p-1.5 text-gray-400">{idx + 1}</td>
-                        <td className="p-1.5 font-medium max-w-[200px] truncate">{c.term}</td>
-                        <td className="p-1.5 text-right">{c.clicks}</td>
-                        <td className="p-1.5 text-right">{c.orders}</td>
-                        <td className="p-1.5 text-right text-green-700">{(c.acos * 100).toFixed(1)}%</td>
-                        <td className="p-1.5 text-right font-mono">${c.recommendedBid.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {result.harvestCandidates.length === 0 && <p className="text-center py-6 text-gray-400">未发现收割候选词</p>}
+              <div className="p-4">
+                <DataTable headers={[
+                  { label: "#" }, { label: "搜索词" }, { label: "点击", align: "right" }, { label: "订单", align: "right" }, { label: "ACOS", align: "right" }, { label: "建议竞价", align: "right" },
+                ]}>
+                  {result.harvestCandidates.slice(0, 100).map((c, idx) => (
+                    <tr key={idx} className="hover:bg-[var(--color-success-light)]" style={{ borderBottom: "1px solid var(--border-default)", transition: "background 150ms" }}>
+                      <td className="p-2.5 text-xs" style={{ color: "var(--text-tertiary)" }}>{idx + 1}</td>
+                      <td className="p-2.5 text-xs font-medium max-w-[220px] truncate">{c.term}</td>
+                      <td className="p-2.5 text-xs text-right">{c.clicks}</td>
+                      <td className="p-2.5 text-xs text-right">{c.orders}</td>
+                      <td className="p-2.5 text-xs text-right" style={{ color: "var(--color-success)" }}>{(c.acos * 100).toFixed(1)}%</td>
+                      <td className="p-2.5 text-xs text-right font-mono">${c.recommendedBid.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </DataTable>
+                {result.harvestCandidates.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "var(--text-tertiary)" }}>未发现收割候选词</p>}
               </div>
             </Card>
           )}
 
           {subTab === "negative" && (
-            <Card className="p-4">
-              <div className="overflow-x-auto max-h-80">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white"><tr className="border-b">
-                    <th className="p-1.5 text-left">#</th><th className="p-1.5 text-left">搜索词</th>
-                    <th className="p-1.5 text-left">原因</th><th className="p-1.5 text-right">点击</th>
-                    <th className="p-1.5 text-right">花费</th><th className="p-1.5 text-right">ACOS</th>
-                  </tr></thead>
-                  <tbody>
-                    {result.negativeCandidates.slice(0, 100).map((c, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 hover:bg-red-50">
-                        <td className="p-1.5 text-gray-400">{idx + 1}</td>
-                        <td className="p-1.5 font-medium max-w-[200px] truncate">{c.term}</td>
-                        <td className="p-1.5">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${c.reason === "no_conversion" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
-                            {c.reason === "no_conversion" ? "零转化" : "高ACOS"}
-                          </span>
-                        </td>
-                        <td className="p-1.5 text-right">{c.clicks}</td>
-                        <td className="p-1.5 text-right text-red-600">${c.spend.toFixed(2)}</td>
-                        <td className="p-1.5 text-right">{c.acos === Infinity ? "∞" : (c.acos * 100).toFixed(1) + "%"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {result.negativeCandidates.length === 0 && <p className="text-center py-6 text-gray-400">未发现否定候选词</p>}
+            <Card>
+              <div className="p-4">
+                <DataTable headers={[
+                  { label: "#" }, { label: "搜索词" }, { label: "原因" }, { label: "点击", align: "right" }, { label: "花费", align: "right" }, { label: "ACOS", align: "right" },
+                ]}>
+                  {result.negativeCandidates.slice(0, 100).map((c, idx) => (
+                    <tr key={idx} className="hover:bg-[var(--color-danger-light)]" style={{ borderBottom: "1px solid var(--border-default)", transition: "background 150ms" }}>
+                      <td className="p-2.5 text-xs" style={{ color: "var(--text-tertiary)" }}>{idx + 1}</td>
+                      <td className="p-2.5 text-xs font-medium max-w-[220px] truncate">{c.term}</td>
+                      <td className="p-2.5"><Badge variant={c.reason === "no_conversion" ? "danger" : "warning"}>{c.reason === "no_conversion" ? "零转化" : "高ACOS"}</Badge></td>
+                      <td className="p-2.5 text-xs text-right">{c.clicks}</td>
+                      <td className="p-2.5 text-xs text-right" style={{ color: "var(--color-danger)" }}>${c.spend.toFixed(2)}</td>
+                      <td className="p-2.5 text-xs text-right">{c.acos === Infinity ? "∞" : (c.acos * 100).toFixed(1) + "%"}</td>
+                    </tr>
+                  ))}
+                </DataTable>
+                {result.negativeCandidates.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "var(--text-tertiary)" }}>未发现否定候选词</p>}
               </div>
             </Card>
           )}
 
           <div className="flex justify-center">
-            <button className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-              onClick={() => { setRows([]); setFileName(""); setResult(null); }}>重新分析</button>
+            <Btn variant="outline" onClick={() => { setRows([]); setFileName(""); setResult(null); }}>
+              {Icons.refresh} 重新分析
+            </Btn>
           </div>
         </>
       )}
