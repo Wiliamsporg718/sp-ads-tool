@@ -411,14 +411,37 @@ function BulkSheetTab() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Bulk Sheet 生成器" description="上传 AD Detail 表格 → 一键生成 Amazon SP Bulk Upload 文件" />
+      <PageHeader title="Bulk Sheet 生成器" description="将你的广告规划表转换为 Amazon Seller Central 可直接上传的 Bulk Sheet 格式" />
 
       {step === "upload" && (
-        <Card>
-          <div className="p-6">
-            <FileUpload onFile={handleFile} label="拖拽 AD Detail 文件到此处" hint="支持 .xlsx / .xls / .xlsm 格式" />
+        <>
+          {/* Feature explanation */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+            {[
+              { step: "1", title: "上传广告规划表", desc: "上传包含广告活动、广告组、SKU、关键词等信息的 AD Detail 表格" },
+              { step: "2", title: "设置投放参数", desc: "选择投放模式（关键词 / ASIN），设置默认竞价" },
+              { step: "3", title: "下载 Bulk Sheet", desc: "自动生成符合 Amazon 格式规范的 Bulk Upload 文件" },
+            ].map((f) => (
+              <Card key={f.step} className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "var(--brand-primary)", color: "#fff" }}>{f.step}</span>
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{f.title}</span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-tertiary)" }}>{f.desc}</p>
+              </Card>
+            ))}
           </div>
-        </Card>
+          <Card>
+            <div className="p-6">
+              <FileUpload onFile={handleFile} label="上传 AD Detail 规划表" hint="支持 .xlsx / .xls / .xlsm — 包含广告活动名称、广告组、SKU、关键词/ASIN 等列" />
+            </div>
+          </Card>
+          <div className="text-center">
+            <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+              没有 AD Detail 文件？使用 <button className="underline" style={{ color: "var(--color-info)" }} onClick={() => {/* hint only */}}>Auto Campaign</button> 功能可直接手动创建广告
+            </p>
+          </div>
+        </>
       )}
 
       {step === "config" && (
@@ -515,6 +538,8 @@ function AsinPrepTab() {
   const [budget, setBudget] = useState("5");
   const [bid, setBid] = useState("0.20");
   const [generated, setGenerated] = useState(false);
+  const [inputMode, setInputMode] = useState<"manual" | "file">("manual");
+  const [manualProducts, setManualProducts] = useState<AsinProduct[]>([{ sku: "", asin: "" }]);
 
   const handleFile = useCallback((file: File) => {
     file.arrayBuffer().then((buffer) => {
@@ -522,10 +547,18 @@ function AsinPrepTab() {
       const sheetName = wb.SheetNames.find((n) => n.includes("ASIN Data")) || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 }) as unknown[][];
-      setProducts(parseAsinDataSheet(raw));
+      const parsed = parseAsinDataSheet(raw);
+      setProducts(parsed);
       setFileName(file.name);
     });
   }, []);
+
+  const handleStartManual = useCallback(() => {
+    const valid = manualProducts.filter((p) => p.sku.trim() && p.asin.trim());
+    if (valid.length < 2) return;
+    setProducts(valid);
+    setFileName(`手动输入 ${valid.length} 个商品`);
+  }, [manualProducts]);
 
   const handleGenerate = useCallback(() => {
     setCombinations(generateAsinPermutations(products));
@@ -542,17 +575,81 @@ function AsinPrepTab() {
   }, [combinations, budget, bid]);
 
   const expectedCombos = products.length * (products.length - 1);
+  const validManualCount = manualProducts.filter((p) => p.sku.trim() && p.asin.trim()).length;
 
   return (
     <div className="space-y-5">
-      <PageHeader title="ASIN 数据准备" description="上传 ASIN 列表 → 自动生成 N × (N-1) 防御性商品投放组合" />
+      <PageHeader title="ASIN 防御组合" description="将你的商品列表自动交叉排列，生成 N × (N-1) 防御性 ASIN 投放组合" />
 
       {products.length === 0 ? (
-        <Card>
-          <div className="p-6">
-            <FileUpload onFile={handleFile} label="上传 ASIN Data 文件" hint="需包含 SKU 和 ASIN 列" />
+        <>
+          {/* Input mode toggle */}
+          <div className="flex gap-0" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            {([
+              { key: "manual" as const, label: "直接输入商品" },
+              { key: "file" as const, label: "从文件导入" },
+            ]).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setInputMode(t.key)}
+                className="px-4 py-2.5 text-sm font-medium transition-colors relative"
+                style={{ color: inputMode === t.key ? "var(--text-primary)" : "var(--text-tertiary)" }}
+              >
+                {t.label}
+                {inputMode === t.key && <div className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full" style={{ background: "var(--border-focus)" }} />}
+              </button>
+            ))}
           </div>
-        </Card>
+
+          {inputMode === "manual" ? (
+            <Card>
+              <CardHeader
+                title="商品列表"
+                description="输入至少 2 个商品的 SKU 和 ASIN，系统将自动生成所有交叉组合"
+                action={
+                  <Btn variant="outline" size="sm" onClick={() => setManualProducts((p) => [...p, { sku: "", asin: "" }])}>
+                    {Icons.plus} 添加
+                  </Btn>
+                }
+              />
+              <div className="px-5 pb-5 space-y-2">
+                {manualProducts.map((p, idx) => (
+                  <div key={idx} className="flex gap-2 items-center group">
+                    <span className="text-xs w-6 text-right font-mono" style={{ color: "var(--text-tertiary)" }}>{idx + 1}.</span>
+                    <input placeholder="SKU"
+                      className="flex-1 h-9 px-3 text-sm font-mono rounded-md transition-all"
+                      style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
+                      value={p.sku} onChange={(e) => setManualProducts((prev) => prev.map((pr, i) => i === idx ? { ...pr, sku: e.target.value } : pr))} />
+                    <input placeholder="ASIN (B0XXXXXXXXX)"
+                      className="flex-1 h-9 px-3 text-sm font-mono rounded-md transition-all"
+                      style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
+                      value={p.asin} onChange={(e) => setManualProducts((prev) => prev.map((pr, i) => i === idx ? { ...pr, asin: e.target.value } : pr))} />
+                    {manualProducts.length > 1 && (
+                      <button className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ color: "var(--color-danger)" }}
+                        onClick={() => setManualProducts((prev) => prev.filter((_, i) => i !== idx))}
+                      >{Icons.x}</button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-3">
+                  <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                    {validManualCount} 个有效商品{validManualCount >= 2 ? ` → ${validManualCount * (validManualCount - 1)} 个组合` : "（至少需要 2 个）"}
+                  </span>
+                  <Btn variant="primary" disabled={validManualCount < 2} onClick={handleStartManual}>
+                    {Icons.zap} 开始组合
+                  </Btn>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <div className="p-6">
+                <FileUpload onFile={handleFile} label="上传 ASIN 列表文件" hint="Excel 文件需包含 SKU 和 ASIN 列（适合大批量商品）" />
+              </div>
+            </Card>
+          )}
+        </>
       ) : (
         <>
           <Card>
@@ -567,8 +664,8 @@ function AsinPrepTab() {
                   </div>
                 </div>
               </div>
-              <Btn variant="ghost" size="sm" onClick={() => { setProducts([]); setGenerated(false); }}>
-                {Icons.refresh} 重新选择
+              <Btn variant="ghost" size="sm" onClick={() => { setProducts([]); setGenerated(false); setCombinations([]); }}>
+                {Icons.refresh} 重新开始
               </Btn>
             </div>
           </Card>
@@ -629,7 +726,7 @@ function AutoCampaignTab() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Auto Campaign 生成器" description="一键创建 SP 自动广告活动（Close Match / Loose Match / Substitutes / Complements）" />
+      <PageHeader title="Auto Campaign 生成器" description="输入商品信息即可一键创建完整的 SP 自动广告活动，包含 4 种匹配类型的独立广告组" />
 
       <Card>
         <CardHeader
@@ -775,14 +872,44 @@ function SearchTermHarvesterTab() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="搜索词收割分析" description="分析高效搜索词（→ Manual Exact 投放）和低效词（→ 否定关键词）" />
+      <PageHeader title="搜索词收割分析" description="上传 Amazon 搜索词报告 → 自动识别高效词（收割到 Manual）和低效词（添加否定）" />
 
       {rows.length === 0 && (
-        <Card>
-          <div className="p-6">
-            <FileUpload onFile={handleFile} accept=".xlsx,.xls,.csv,.xlsm" label="上传 Search Term Report" hint="Amazon 后台导出的搜索词报告" />
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ background: "var(--color-success-light)", color: "var(--color-success)" }}>✓</span>
+                <span className="text-sm font-semibold" style={{ color: "var(--color-success)" }}>收割高效词</span>
+              </div>
+              <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>找出点击高、转化好、ACOS 低的搜索词，建议添加到 Manual Exact 广告组精准投放</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ background: "var(--color-danger-light)", color: "var(--color-danger)" }}>✕</span>
+                <span className="text-sm font-semibold" style={{ color: "var(--color-danger)" }}>否定低效词</span>
+              </div>
+              <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>找出花费高但零转化或 ACOS 过高的搜索词，建议添加为否定关键词节省预算</p>
+            </Card>
           </div>
-        </Card>
+          <Card>
+            <div className="p-6">
+              <FileUpload onFile={handleFile} accept=".xlsx,.xls,.csv,.xlsm" label="上传搜索词报告" hint="Amazon Seller Central → 广告 → 搜索词报告 → 导出" />
+            </div>
+            <div className="px-6 pb-5">
+              <details className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                <summary className="cursor-pointer hover:underline font-medium mb-2">如何下载搜索词报告？</summary>
+                <ol className="list-decimal list-inside space-y-1 ml-1">
+                  <li>登录 Amazon Seller Central</li>
+                  <li>进入 广告 → 广告活动管理器</li>
+                  <li>点击"报告"标签</li>
+                  <li>创建报告：类型选"搜索词"，时间范围建议 30-60 天</li>
+                  <li>下载 .xlsx 文件并上传到此处</li>
+                </ol>
+              </details>
+            </div>
+          </Card>
+        </>
       )}
 
       {rows.length > 0 && !result && (
