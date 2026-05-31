@@ -135,7 +135,6 @@ export default function App() {
           {tab === "manual" && <ManualCampaignTab />}
           {tab === "auto" && <AutoCampaignTab />}
           {tab === "asin" && <AsinPrepTab />}
-          {tab === "auto" && <AutoCampaignTab />}
           {tab === "harvest" && <SearchTermHarvesterTab />}
         </div>
       </main>
