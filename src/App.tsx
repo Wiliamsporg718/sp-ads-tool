@@ -84,10 +84,11 @@ const Icons = {
 // Tab config
 // ---------------------------------------------------------------------------
 
-type Tab = "bulk" | "asin" | "auto" | "harvest";
+type Tab = "bulk" | "manual" | "asin" | "auto" | "harvest";
 
 const TAB_CONFIG: { key: Tab; label: string; desc: string }[] = [
-  { key: "bulk", label: "Bulk Sheet", desc: "批量广告表" },
+  { key: "bulk", label: "Bulk Sheet", desc: "文件转换" },
+  { key: "manual", label: "手动投放", desc: "关键词/ASIN" },
   { key: "asin", label: "ASIN 组合", desc: "防御组合" },
   { key: "auto", label: "Auto Campaign", desc: "自动广告" },
   { key: "harvest", label: "搜索词分析", desc: "收割/否定" },
@@ -133,6 +134,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="animate-fadeIn">
           {tab === "bulk" && <BulkSheetTab />}
+          {tab === "manual" && <ManualCampaignTab />}
           {tab === "asin" && <AsinPrepTab />}
           {tab === "auto" && <AutoCampaignTab />}
           {tab === "harvest" && <SearchTermHarvesterTab />}
@@ -528,7 +530,258 @@ function BulkSheetTab() {
 }
 
 // ===========================================================================
-// Tab 2: ASIN Prep
+// Tab 2: Manual Campaign (Keyword / ASIN Targeting)
+// ===========================================================================
+
+interface ManualKeywordEntry {
+  keyword: string;
+  matchType: "exact" | "phrase" | "broad";
+  bid: string;
+}
+
+interface ManualAdGroup {
+  name: string;
+  sku: string;
+  asin: string;
+  keywords: ManualKeywordEntry[];
+}
+
+function ManualCampaignTab() {
+  const [campaignName, setCampaignName] = useState("");
+  const [budget, setBudget] = useState("10.00");
+  const [defaultBid, setDefaultBid] = useState("0.50");
+  const [biddingStrategy, setBiddingStrategy] = useState("Dynamic bids - down only");
+  const [mode, setMode] = useState<"keyword" | "asin">("keyword");
+  const [adGroups, setAdGroups] = useState<ManualAdGroup[]>([{
+    name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }],
+  }]);
+  const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
+  const [stats, setStats] = useState<BulkSheetStats | null>(null);
+  const [generated, setGenerated] = useState(false);
+
+  const updateAdGroup = useCallback((idx: number, patch: Partial<ManualAdGroup>) => {
+    setAdGroups((prev) => prev.map((g, i) => i === idx ? { ...g, ...patch } : g));
+  }, []);
+
+  const addKeyword = useCallback((groupIdx: number) => {
+    setAdGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, keywords: [...g.keywords, { keyword: "", matchType: "exact", bid: "" }] } : g));
+  }, []);
+
+  const updateKeyword = useCallback((groupIdx: number, kwIdx: number, patch: Partial<ManualKeywordEntry>) => {
+    setAdGroups((prev) => prev.map((g, gi) => gi === groupIdx ? {
+      ...g, keywords: g.keywords.map((k, ki) => ki === kwIdx ? { ...k, ...patch } : k),
+    } : g));
+  }, []);
+
+  const removeKeyword = useCallback((groupIdx: number, kwIdx: number) => {
+    setAdGroups((prev) => prev.map((g, gi) => gi === groupIdx ? {
+      ...g, keywords: g.keywords.filter((_, ki) => ki !== kwIdx),
+    } : g));
+  }, []);
+
+  const handleGenerate = useCallback(() => {
+    // Convert manual entries → AdDetailRow[]
+    const adDetailRows: AdDetailRow[] = [];
+    for (const group of adGroups) {
+      if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
+      for (const kw of group.keywords) {
+        if (!kw.keyword.trim()) continue;
+        adDetailRows.push({
+          campaignName: campaignName || "Manual Campaign",
+          adGroupName: group.name,
+          budget: parseFloat(budget) || 10,
+          sku: group.sku,
+          asin: group.asin,
+          bid: kw.bid ? parseFloat(kw.bid) : null,
+          keywordText: kw.keyword,
+          matchType: kw.matchType,
+          biddingStrategy,
+          startDate: "",
+        });
+      }
+    }
+
+    if (adDetailRows.length === 0) return;
+
+    const opts: BulkSheetOptions = { defaultAdGroupBid: defaultBid, targetingType: "manual", mode };
+    const result = generateBulkSheet(adDetailRows, opts);
+    setBulkRows(result); setStats(getBulkSheetStats(result)); setGenerated(true);
+  }, [adGroups, campaignName, budget, defaultBid, biddingStrategy, mode]);
+
+  const handleDownload = useCallback(() => {
+    const prefix = mode === "asin" ? "BULK ASIN" : "BULK MANUAL";
+    downloadXlsx(
+      [{ name: prefix, data: [[...BULK_SHEET_HEADERS], ...bulkRows.map(bulkRowToArray)] }],
+      `${prefix} ${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  }, [bulkRows, mode]);
+
+  const totalKeywords = adGroups.reduce((sum, g) => sum + g.keywords.filter((k) => k.keyword.trim()).length, 0);
+  const validGroups = adGroups.filter((g) => g.name.trim() && (g.sku.trim() || g.asin.trim()));
+
+  return (
+    <div className="space-y-5">
+      <PageHeader title="手动关键词投放" description="直接输入广告活动、广告组和关键词 → 生成可上传的 Bulk Sheet，无需事先准备任何文件" />
+
+      {!generated ? (
+        <>
+          {/* Campaign config */}
+          <Card>
+            <CardHeader title="广告活动设置" />
+            <div className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <Input label="广告活动名称" placeholder="SP_Brand_Manual" value={campaignName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCampaignName(e.target.value)} />
+                <Input label="日预算 ($)" type="number" step="0.01" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBudget(e.target.value)} />
+                <Input label="默认竞价 ($)" type="number" step="0.01" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
+                <Select label="投放模式" value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "asin")}>
+                  <option value="keyword">关键词投放</option>
+                  <option value="asin">ASIN 投放</option>
+                </Select>
+              </div>
+              <Select label="竞价策略" value={biddingStrategy} onChange={(e) => setBiddingStrategy(e.target.value)}>
+                <option value="Dynamic bids - down only">Dynamic bids - down only（仅降低）</option>
+                <option value="Dynamic bids - up and down">Dynamic bids - up and down（双向调整）</option>
+                <option value="Fixed bid">Fixed bid（固定竞价）</option>
+              </Select>
+            </div>
+          </Card>
+
+          {/* Ad Groups */}
+          {adGroups.map((group, gi) => (
+            <Card key={gi}>
+              <div className="p-5 flex items-start justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
+                <div className="flex items-center gap-2">
+                  <Badge variant="success">广告组 {gi + 1}</Badge>
+                  {adGroups.length > 1 && (
+                    <button className="p-1 rounded-md" style={{ color: "var(--color-danger)" }}
+                      onClick={() => setAdGroups((prev) => prev.filter((_, i) => i !== gi))}>
+                      {Icons.x}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Input label="广告组名称" placeholder="e.g. Brand_Exact" value={group.name}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { name: e.target.value })} />
+                  <Input label="SKU" placeholder="ABC-123" value={group.sku}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { sku: e.target.value })} />
+                  <Input label="ASIN" placeholder="B0XXXXXXXXX" value={group.asin}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { asin: e.target.value })} />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                      {mode === "keyword" ? "关键词" : "投放 ASIN"}
+                    </label>
+                    <Btn variant="outline" size="sm" onClick={() => addKeyword(gi)}>{Icons.plus} 添加</Btn>
+                  </div>
+                  <div className="space-y-2">
+                    {group.keywords.map((kw, ki) => (
+                      <div key={ki} className="flex gap-2 items-center group">
+                        <input
+                          placeholder={mode === "keyword" ? "输入关键词..." : "B0XXXXXXXXX"}
+                          className="flex-1 h-9 px-3 text-sm rounded-md"
+                          style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
+                          value={kw.keyword} onChange={(e) => updateKeyword(gi, ki, { keyword: e.target.value })}
+                        />
+                        {mode === "keyword" && (
+                          <select
+                            className="h-9 px-2 text-xs rounded-md"
+                            style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)", color: "var(--text-primary)", minWidth: "90px" }}
+                            value={kw.matchType} onChange={(e) => updateKeyword(gi, ki, { matchType: e.target.value as "exact" | "phrase" | "broad" })}
+                          >
+                            <option value="exact">Exact</option>
+                            <option value="phrase">Phrase</option>
+                            <option value="broad">Broad</option>
+                          </select>
+                        )}
+                        <input
+                          placeholder="竞价"
+                          className="w-20 h-9 px-2 text-sm text-right font-mono rounded-md"
+                          style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
+                          value={kw.bid} onChange={(e) => updateKeyword(gi, ki, { bid: e.target.value })}
+                        />
+                        {group.keywords.length > 1 && (
+                          <button className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ color: "var(--color-danger)" }} onClick={() => removeKeyword(gi, ki)}>
+                            {Icons.x}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          {/* Add group + Generate */}
+          <div className="flex items-center justify-between">
+            <Btn variant="outline" onClick={() => setAdGroups((prev) => [...prev, { name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }])}>
+              {Icons.plus} 添加广告组
+            </Btn>
+            <div className="flex items-center gap-3">
+              <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                {validGroups.length} 个广告组 · {totalKeywords} 个{mode === "keyword" ? "关键词" : "ASIN"}
+              </span>
+              <Btn variant="primary" disabled={validGroups.length === 0 || totalKeywords === 0} onClick={handleGenerate}>
+                {Icons.zap} 生成 Bulk Sheet
+              </Btn>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {stats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="广告活动" value={stats.campaignCount} />
+              <StatCard label="广告组" value={stats.adGroupCount} />
+              <StatCard label="商品广告" value={stats.productAdCount} />
+              <StatCard label="总行数" value={stats.totalRows} color="var(--color-success)" />
+              {stats.keywordCount > 0 && <StatCard label="关键词" value={stats.keywordCount} color="var(--color-info)" />}
+              {stats.productTargetingCount > 0 && <StatCard label="商品投放" value={stats.productTargetingCount} color="var(--color-purple)" />}
+            </div>
+          )}
+          <Card>
+            <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
+              <div className="flex items-center gap-2">
+                <span style={{ color: "var(--color-success)" }}>{Icons.check}</span>
+                <span className="font-medium text-sm" style={{ color: "var(--color-success)" }}>生成完成</span>
+              </div>
+              <div className="flex gap-2">
+                <Btn variant="ghost" size="sm" onClick={() => { setGenerated(false); setBulkRows([]); setStats(null); }}>
+                  {Icons.refresh} 返回编辑
+                </Btn>
+                <Btn variant="primary" size="sm" onClick={handleDownload}>{Icons.download} 下载 XLSX</Btn>
+              </div>
+            </div>
+            <div className="p-4">
+              <DataTable headers={[
+                { label: "#" }, { label: "Entity" }, { label: "Campaign" }, { label: "Ad Group" }, { label: "SKU" }, { label: "Keyword / ASIN" },
+              ]}>
+                {bulkRows.slice(0, 50).map((row, idx) => (
+                  <tr key={idx} className="hover:bg-[var(--surface-hover)]" style={{ borderBottom: "1px solid var(--border-default)" }}>
+                    <td className="p-2.5 text-xs" style={{ color: "var(--text-tertiary)" }}>{idx + 1}</td>
+                    <td className="p-2.5"><EntityBadge entity={row.entity} /></td>
+                    <td className="p-2.5 text-xs max-w-[180px] truncate">{row.campaignNameInfo}</td>
+                    <td className="p-2.5 text-xs max-w-[140px] truncate">{row.adGroupNameInfo}</td>
+                    <td className="p-2.5 text-xs font-mono">{row.sku}</td>
+                    <td className="p-2.5 text-xs max-w-[140px] truncate">{row.keywordText || row.productTargetingExpression}</td>
+                  </tr>
+                ))}
+              </DataTable>
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ===========================================================================
+// Tab 3: ASIN Prep
 // ===========================================================================
 
 function AsinPrepTab() {
