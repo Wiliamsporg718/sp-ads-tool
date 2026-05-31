@@ -609,11 +609,13 @@ function ManualCampaignTab() {
                   <option value="asin">ASIN 投放</option>
                 </Select>
               </div>
-              <Select label="竞价策略" value={biddingStrategy} onChange={(e) => setBiddingStrategy(e.target.value)}>
-                <option value="Dynamic bids - down only">Dynamic bids - down only（仅降低）</option>
-                <option value="Dynamic bids - up and down">Dynamic bids - up and down（双向调整）</option>
-                <option value="Fixed bid">Fixed bid（固定竞价）</option>
-              </Select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select label="竞价策略" value={biddingStrategy} onChange={(e) => setBiddingStrategy(e.target.value)}>
+                  <option value="Dynamic bids - down only">Dynamic bids - down only（仅降低）</option>
+                  <option value="Dynamic bids - up and down">Dynamic bids - up and down（双向调整）</option>
+                  <option value="Fixed bid">Fixed bid（固定竞价）</option>
+                </Select>
+              </div>
             </div>
           </Card>
 
@@ -697,8 +699,8 @@ function ManualCampaignTab() {
                         />
                         {mode === "keyword" && (
                           <select
-                            className="h-9 px-2 text-xs rounded-md"
-                            style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)", color: "var(--text-primary)", minWidth: "90px" }}
+                            className="h-9 px-2 text-xs rounded-md appearance-none pr-7"
+                            style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)", color: "var(--text-primary)", minWidth: "90px", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundPosition: "right 6px center", backgroundRepeat: "no-repeat" }}
                             value={kw.matchType} onChange={(e) => updateKeyword(gi, ki, { matchType: e.target.value as "exact" | "phrase" | "broad" })}
                           >
                             <option value="exact">Exact</option>
@@ -707,13 +709,13 @@ function ManualCampaignTab() {
                           </select>
                         )}
                         <input
-                          placeholder="竞价"
+                          placeholder="$ 0.50"
                           className="w-20 h-9 px-2 text-sm text-right font-mono rounded-md"
                           style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
                           value={kw.bid} onChange={(e) => updateKeyword(gi, ki, { bid: e.target.value })}
                         />
                         {group.keywords.length > 1 && (
-                          <button className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                             style={{ color: "var(--color-danger)" }} onClick={() => removeKeyword(gi, ki)}>
                             {Icons.x}
                           </button>
