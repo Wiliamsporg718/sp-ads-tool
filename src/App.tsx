@@ -320,12 +320,13 @@ function EntityBadge({ entity }: { entity: string }) {
   );
 }
 
-function Badge({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "success" | "warning" | "danger" }) {
+function Badge({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "success" | "warning" | "danger" | "info" }) {
   const colors = {
     default: { bg: "var(--surface-muted)", fg: "var(--text-secondary)" },
     success: { bg: "var(--color-success-light)", fg: "var(--color-success-text)" },
     warning: { bg: "var(--color-warning-light)", fg: "var(--color-warning-text)" },
     danger: { bg: "var(--color-danger-light)", fg: "var(--color-danger-text)" },
+    info: { bg: "var(--color-info-light, rgba(0,120,212,0.1))", fg: "var(--color-info, #0078d4)" },
   };
   const c = colors[variant];
   return <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium" style={{ background: c.bg, color: c.fg }}>{children}</span>;
@@ -378,26 +379,30 @@ interface ManualKeywordEntry {
 }
 
 interface ManualAdGroup {
-  campaignName: string;  // which campaign this group belongs to
   name: string;
   sku: string;
   asin: string;
   keywords: ManualKeywordEntry[];
 }
 
+interface ManualCampaign {
+  name: string;
+  adGroups: ManualAdGroup[];
+}
+
 function ManualCampaignTab() {
-  const [defaultCampaignName, setDefaultCampaignName] = useState("SP_Brand_Manual");
   const [budget, setBudget] = useState("10.00");
   const [defaultBid, setDefaultBid] = useState("0.50");
   const [biddingStrategy, setBiddingStrategy] = useState("Dynamic bids - down only");
   const [mode, setMode] = useState<"keyword" | "asin">("keyword");
-  const [adGroups, setAdGroups] = useState<ManualAdGroup[]>([{
-    campaignName: "", name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }],
+  const [campaigns, setCampaigns] = useState<ManualCampaign[]>([{
+    name: "SP_Brand_Manual",
+    adGroups: [{ name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
   }]);
   const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
   const [stats, setStats] = useState<BulkSheetStats | null>(null);
   const [generated, setGenerated] = useState(false);
-  const [showBatchPaste, setShowBatchPaste] = useState<number | null>(null);
+  const [showBatchPaste, setShowBatchPaste] = useState<string | null>(null); // "ci-gi" format
   const [batchText, setBatchText] = useState("");
   // File import state
   const [inputSource, setInputSource] = useState<"manual" | "file">("manual");
@@ -405,52 +410,81 @@ function ManualCampaignTab() {
   const [fileName, setFileName] = useState("");
   const [fileErrors, setFileErrors] = useState<{ row: number; field: string; message: string }[]>([]);
 
-  const updateAdGroup = useCallback((idx: number, patch: Partial<ManualAdGroup>) => {
-    setAdGroups((prev) => prev.map((g, i) => i === idx ? { ...g, ...patch } : g));
+  const updateCampaign = useCallback((ci: number, patch: Partial<ManualCampaign>) => {
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? { ...c, ...patch } : c));
   }, []);
 
-  const addKeyword = useCallback((groupIdx: number) => {
-    setAdGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, keywords: [...g.keywords, { keyword: "", matchType: "exact", bid: "" }] } : g));
+  const updateAdGroup = useCallback((ci: number, gi: number, patch: Partial<ManualAdGroup>) => {
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: c.adGroups.map((g, j) => j === gi ? { ...g, ...patch } : g),
+    } : c));
   }, []);
 
-  const updateKeyword = useCallback((groupIdx: number, kwIdx: number, patch: Partial<ManualKeywordEntry>) => {
-    setAdGroups((prev) => prev.map((g, gi) => gi === groupIdx ? {
-      ...g, keywords: g.keywords.map((k, ki) => ki === kwIdx ? { ...k, ...patch } : k),
-    } : g));
+  const addAdGroup = useCallback((ci: number) => {
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: [...c.adGroups, { name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
+    } : c));
   }, []);
 
-  const removeKeyword = useCallback((groupIdx: number, kwIdx: number) => {
-    setAdGroups((prev) => prev.map((g, gi) => gi === groupIdx ? {
-      ...g, keywords: g.keywords.filter((_, ki) => ki !== kwIdx),
-    } : g));
+  const removeAdGroup = useCallback((ci: number, gi: number) => {
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: c.adGroups.filter((_, j) => j !== gi),
+    } : c));
   }, []);
 
-  // Batch paste: one keyword per line
-  const handleBatchPaste = useCallback((groupIdx: number) => {
+  const addKeyword = useCallback((ci: number, gi: number) => {
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: c.adGroups.map((g, j) => j === gi ? {
+        ...g, keywords: [...g.keywords, { keyword: "", matchType: "exact", bid: "" }],
+      } : g),
+    } : c));
+  }, []);
+
+  const updateKeyword = useCallback((ci: number, gi: number, ki: number, patch: Partial<ManualKeywordEntry>) => {
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: c.adGroups.map((g, j) => j === gi ? {
+        ...g, keywords: g.keywords.map((k, kk) => kk === ki ? { ...k, ...patch } : k),
+      } : g),
+    } : c));
+  }, []);
+
+  const removeKeyword = useCallback((ci: number, gi: number, ki: number) => {
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: c.adGroups.map((g, j) => j === gi ? {
+        ...g, keywords: g.keywords.filter((_, kk) => kk !== ki),
+      } : g),
+    } : c));
+  }, []);
+
+  const handleBatchPaste = useCallback((ci: number, gi: number) => {
     const lines = batchText.split(/\n/).map((l) => l.trim()).filter((l) => l.length > 0);
     if (lines.length === 0) return;
     const newKeywords: ManualKeywordEntry[] = lines.map((l) => ({ keyword: l, matchType: "exact" as const, bid: "" }));
-    setAdGroups((prev) => prev.map((g, i) => i === groupIdx ? {
-      ...g, keywords: [...g.keywords.filter((k) => k.keyword.trim()), ...newKeywords],
-    } : g));
-    setBatchText("");
-    setShowBatchPaste(null);
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: c.adGroups.map((g, j) => j === gi ? {
+        ...g, keywords: [...g.keywords.filter((k) => k.keyword.trim()), ...newKeywords],
+      } : g),
+    } : c));
+    setBatchText(""); setShowBatchPaste(null);
   }, [batchText]);
 
-  // Quick template: create 3 ad groups (Exact/Phrase/Broad) with same keywords
-  const handleQuickTemplate = useCallback(() => {
-    const baseName = defaultCampaignName || "SP_Manual";
-    const sku = adGroups[0]?.sku || "";
-    const asin = adGroups[0]?.asin || "";
-    const existingKws = adGroups[0]?.keywords.filter((k) => k.keyword.trim()) || [];
+  // Quick template: for a campaign, create 3 ad groups (Exact/Phrase/Broad)
+  const handleQuickTemplate = useCallback((ci: number) => {
+    const camp = campaigns[ci];
+    const baseName = camp.name || "SP_Manual";
+    const sku = camp.adGroups[0]?.sku || "";
+    const asin = camp.adGroups[0]?.asin || "";
+    const existingKws = camp.adGroups[0]?.keywords.filter((k) => k.keyword.trim()) || [];
     const templateKws = existingKws.length > 0 ? existingKws : [{ keyword: "", matchType: "exact" as const, bid: "" }];
 
-    setAdGroups([
-      { campaignName: "", name: `${baseName}_Exact`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "exact" as const })) },
-      { campaignName: "", name: `${baseName}_Phrase`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "phrase" as const })) },
-      { campaignName: "", name: `${baseName}_Broad`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "broad" as const })) },
-    ]);
-  }, [defaultCampaignName, adGroups]);
+    setCampaigns((prev) => prev.map((c, i) => i === ci ? {
+      ...c, adGroups: [
+        { name: `${baseName}_Exact`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "exact" as const })) },
+        { name: `${baseName}_Phrase`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "phrase" as const })) },
+        { name: `${baseName}_Broad`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "broad" as const })) },
+      ],
+    } : c));
+  }, [campaigns]);
 
   // File import handler
   const handleFileImport = useCallback((file: File) => {
@@ -474,23 +508,25 @@ function ManualCampaignTab() {
       adDetailRows = fileRows;
     } else {
       adDetailRows = [];
-      for (const group of adGroups) {
-        if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
-        const campName = group.campaignName.trim() || defaultCampaignName || "Manual Campaign";
-        for (const kw of group.keywords) {
-          if (!kw.keyword.trim()) continue;
-          adDetailRows.push({
-            campaignName: campName,
-            adGroupName: group.name,
-            budget: parseFloat(budget) || 10,
-            sku: group.sku,
-            asin: group.asin,
-            bid: kw.bid ? parseFloat(kw.bid) : null,
-            keywordText: kw.keyword,
-            matchType: kw.matchType,
-            biddingStrategy,
-            startDate: "",
-          });
+      for (const camp of campaigns) {
+        const campName = camp.name.trim() || "Manual Campaign";
+        for (const group of camp.adGroups) {
+          if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
+          for (const kw of group.keywords) {
+            if (!kw.keyword.trim()) continue;
+            adDetailRows.push({
+              campaignName: campName,
+              adGroupName: group.name,
+              budget: parseFloat(budget) || 10,
+              sku: group.sku,
+              asin: group.asin,
+              bid: kw.bid ? parseFloat(kw.bid) : null,
+              keywordText: kw.keyword,
+              matchType: kw.matchType,
+              biddingStrategy,
+              startDate: "",
+            });
+          }
         }
       }
     }
@@ -500,7 +536,7 @@ function ManualCampaignTab() {
     const opts: BulkSheetOptions = { defaultAdGroupBid: defaultBid, targetingType: "manual", mode };
     const result = generateBulkSheet(adDetailRows, opts);
     setBulkRows(result); setStats(getBulkSheetStats(result)); setGenerated(true);
-  }, [inputSource, fileRows, adGroups, defaultCampaignName, budget, defaultBid, biddingStrategy, mode]);
+  }, [inputSource, fileRows, campaigns, budget, defaultBid, biddingStrategy, mode]);
 
   const handleDownload = useCallback(() => {
     const prefix = mode === "asin" ? "BULK ASIN" : "BULK MANUAL";
@@ -510,9 +546,9 @@ function ManualCampaignTab() {
     );
   }, [bulkRows, mode]);
 
-  const totalKeywords = adGroups.reduce((sum, g) => sum + g.keywords.filter((k) => k.keyword.trim()).length, 0);
-  const validGroups = adGroups.filter((g) => g.name.trim() && (g.sku.trim() || g.asin.trim()));
-  const uniqueCampaigns = new Set(validGroups.map((g) => g.campaignName.trim() || defaultCampaignName || "Manual Campaign")).size;
+  const totalKeywords = campaigns.reduce((sum, c) => sum + c.adGroups.reduce((s, g) => s + g.keywords.filter((k) => k.keyword.trim()).length, 0), 0);
+  const totalGroups = campaigns.reduce((sum, c) => sum + c.adGroups.filter((g) => g.name.trim() && (g.sku.trim() || g.asin.trim())).length, 0);
+  const validCampaignCount = campaigns.filter((c) => c.name.trim() && c.adGroups.some((g) => g.name.trim())).length;
 
   return (
     <div className="space-y-5">
@@ -599,12 +635,11 @@ function ManualCampaignTab() {
           ) : (
             /* Manual input mode */
             <>
-          {/* Campaign config */}
+          {/* Global settings */}
           <Card>
-            <CardHeader title="广告活动设置" />
+            <CardHeader title="全局设置" />
             <div className="px-5 pb-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <Input label="默认广告活动名称" placeholder="SP_Brand_Manual" value={defaultCampaignName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultCampaignName(e.target.value)} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <Input label="日预算 ($)" type="number" step="0.01" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBudget(e.target.value)} />
                 <Input label="默认竞价 ($)" type="number" step="0.01" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
                 <Select label="投放模式" value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "asin")}>
@@ -622,127 +657,151 @@ function ManualCampaignTab() {
             </div>
           </Card>
 
-          {/* Quick actions */}
-          <div className="flex gap-2 flex-wrap">
-            <Btn variant="outline" size="sm" onClick={handleQuickTemplate}>
-              {Icons.zap} 快速模板：3 匹配类型
-            </Btn>
-            <span className="text-xs self-center" style={{ color: "var(--text-tertiary)" }}>
-              一键创建 Exact + Phrase + Broad 三个广告组
-            </span>
-          </div>
-
-          {/* Ad Groups */}
-          {adGroups.map((group, gi) => (
-            <Card key={gi}>
-              <div className="p-5 flex items-start justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
-                <div className="flex items-center gap-2">
-                  <Badge variant="success">广告组 {gi + 1}</Badge>
-                  {adGroups.length > 1 && (
-                    <button className="p-1 rounded-md" style={{ color: "var(--color-danger)" }}
-                      onClick={() => setAdGroups((prev) => prev.filter((_, i) => i !== gi))}>
-                      {Icons.x}
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <Input label="广告活动" placeholder={defaultCampaignName || "使用默认名称"} value={group.campaignName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { campaignName: e.target.value })} />
-                  <Input label="广告组名称" placeholder="e.g. Brand_Exact" value={group.name}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { name: e.target.value })} />
-                  <Input label="SKU" placeholder="ABC-123" value={group.sku}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { sku: e.target.value })} />
-                  <Input label="ASIN" placeholder="B0XXXXXXXXX" value={group.asin}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { asin: e.target.value })} />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {mode === "keyword" ? "关键词" : "投放 ASIN"}
-                    </label>
-                    <div className="flex gap-1">
-                      <Btn variant="ghost" size="sm" onClick={() => { setShowBatchPaste(showBatchPaste === gi ? null : gi); setBatchText(""); }}>
-                        批量粘贴
-                      </Btn>
-                      <Btn variant="outline" size="sm" onClick={() => addKeyword(gi)}>{Icons.plus} 添加</Btn>
-                    </div>
+          {/* Campaigns */}
+          {campaigns.map((camp, ci) => (
+            <div key={ci} className="space-y-3">
+              {/* Campaign header */}
+              <div className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-primary)", background: "var(--surface-card)" }}>
+                <div className="px-5 py-3 flex items-center justify-between" style={{ background: "rgba(255,153,0,0.06)", borderBottom: "1px solid var(--border-default)" }}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Badge variant="info">广告活动 {ci + 1}</Badge>
+                    <input
+                      className="flex-1 h-8 px-2 text-sm font-medium rounded-md min-w-0"
+                      style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                      placeholder="广告活动名称"
+                      value={camp.name}
+                      onChange={(e) => updateCampaign(ci, { name: e.target.value })}
+                    />
                   </div>
+                  <div className="flex items-center gap-1 ml-2">
+                    <Btn variant="ghost" size="sm" onClick={() => handleQuickTemplate(ci)}>
+                      {Icons.zap} 3匹配
+                    </Btn>
+                    <Btn variant="outline" size="sm" onClick={() => addAdGroup(ci)}>
+                      {Icons.plus} 广告组
+                    </Btn>
+                    {campaigns.length > 1 && (
+                      <button className="p-1 rounded-md ml-1" style={{ color: "var(--color-danger)" }}
+                        onClick={() => setCampaigns((prev) => prev.filter((_, i) => i !== ci))}>
+                        {Icons.x}
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-                  {/* Batch paste area */}
-                  {showBatchPaste === gi && (
-                    <div className="mb-3 p-3 rounded-lg" style={{ background: "var(--surface-muted)", border: "1px solid var(--border-default)" }}>
-                      <textarea
-                        rows={5}
-                        className="w-full px-3 py-2 text-sm rounded-md mb-2 resize-none"
-                        style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
-                        placeholder={"每行一个关键词，例如：\nwireless headphones\nbluetooth earbuds\nnoise cancelling"}
-                        value={batchText}
-                        onChange={(e) => setBatchText(e.target.value)}
-                      />
+                {/* Ad groups within this campaign */}
+                <div className="divide-y" style={{ borderColor: "var(--border-default)" }}>
+                  {camp.adGroups.map((group, gi) => (
+                    <div key={gi} className="p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                          {batchText.split(/\n/).filter((l) => l.trim()).length} 个关键词
-                        </span>
-                        <div className="flex gap-2">
-                          <Btn variant="ghost" size="sm" onClick={() => setShowBatchPaste(null)}>取消</Btn>
-                          <Btn variant="primary" size="sm" onClick={() => handleBatchPaste(gi)}>添加全部</Btn>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="success">广告组 {gi + 1}</Badge>
+                          {camp.adGroups.length > 1 && (
+                            <button className="p-1 rounded-md" style={{ color: "var(--color-danger)" }}
+                              onClick={() => removeAdGroup(ci, gi)}>
+                              {Icons.x}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <Input label="广告组名称" placeholder="e.g. Brand_Exact" value={group.name}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(ci, gi, { name: e.target.value })} />
+                        <Input label="SKU" placeholder="ABC-123" value={group.sku}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(ci, gi, { sku: e.target.value })} />
+                        <Input label="ASIN" placeholder="B0XXXXXXXXX" value={group.asin}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(ci, gi, { asin: e.target.value })} />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                            {mode === "keyword" ? "关键词" : "投放 ASIN"}
+                          </label>
+                          <div className="flex gap-1">
+                            <Btn variant="ghost" size="sm" onClick={() => { setShowBatchPaste(showBatchPaste === `${ci}-${gi}` ? null : `${ci}-${gi}`); setBatchText(""); }}>
+                              批量粘贴
+                            </Btn>
+                            <Btn variant="outline" size="sm" onClick={() => addKeyword(ci, gi)}>{Icons.plus} 添加</Btn>
+                          </div>
+                        </div>
+
+                        {showBatchPaste === `${ci}-${gi}` && (
+                          <div className="mb-3 p-3 rounded-lg" style={{ background: "var(--surface-muted)", border: "1px solid var(--border-default)" }}>
+                            <textarea
+                              rows={4}
+                              className="w-full px-3 py-2 text-sm rounded-md mb-2 resize-none"
+                              style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                              placeholder={"每行一个关键词：\nwireless headphones\nbluetooth earbuds"}
+                              value={batchText}
+                              onChange={(e) => setBatchText(e.target.value)}
+                            />
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                                {batchText.split(/\n/).filter((l) => l.trim()).length} 个关键词
+                              </span>
+                              <div className="flex gap-2">
+                                <Btn variant="ghost" size="sm" onClick={() => setShowBatchPaste(null)}>取消</Btn>
+                                <Btn variant="primary" size="sm" onClick={() => handleBatchPaste(ci, gi)}>添加全部</Btn>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          {group.keywords.map((kw, ki) => (
+                            <div key={ki} className="flex gap-2 items-center group">
+                              <input
+                                placeholder={mode === "keyword" ? "输入关键词..." : "B0XXXXXXXXX"}
+                                className="flex-1 h-9 px-3 text-sm rounded-md"
+                                style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                                value={kw.keyword} onChange={(e) => updateKeyword(ci, gi, ki, { keyword: e.target.value })}
+                              />
+                              {mode === "keyword" && (
+                                <select
+                                  className="h-9 px-2 text-xs rounded-md appearance-none pr-7"
+                                  style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)", color: "var(--text-primary)", minWidth: "90px", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundPosition: "right 6px center", backgroundRepeat: "no-repeat" }}
+                                  value={kw.matchType} onChange={(e) => updateKeyword(ci, gi, ki, { matchType: e.target.value as "exact" | "phrase" | "broad" })}
+                                >
+                                  <option value="exact">Exact</option>
+                                  <option value="phrase">Phrase</option>
+                                  <option value="broad">Broad</option>
+                                </select>
+                              )}
+                              <input
+                                placeholder="$ 0.50"
+                                className="w-20 h-9 px-2 text-sm text-right font-mono rounded-md"
+                                style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)" }}
+                                value={kw.bid} onChange={(e) => updateKeyword(ci, gi, ki, { bid: e.target.value })}
+                              />
+                              {group.keywords.length > 1 && (
+                                <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                                  style={{ color: "var(--color-danger)" }} onClick={() => removeKeyword(ci, gi, ki)}>
+                                  {Icons.x}
+                                </button>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
-                  )}
-                  <div className="space-y-2">
-                    {group.keywords.map((kw, ki) => (
-                      <div key={ki} className="flex gap-2 items-center group">
-                        <input
-                          placeholder={mode === "keyword" ? "输入关键词..." : "B0XXXXXXXXX"}
-                          className="flex-1 h-9 px-3 text-sm rounded-md"
-                          style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
-                          value={kw.keyword} onChange={(e) => updateKeyword(gi, ki, { keyword: e.target.value })}
-                        />
-                        {mode === "keyword" && (
-                          <select
-                            className="h-9 px-2 text-xs rounded-md appearance-none pr-7"
-                            style={{ border: "1px solid var(--border-default)", backgroundColor: "var(--surface-card)", color: "var(--text-primary)", minWidth: "90px", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundPosition: "right 6px center", backgroundRepeat: "no-repeat" }}
-                            value={kw.matchType} onChange={(e) => updateKeyword(gi, ki, { matchType: e.target.value as "exact" | "phrase" | "broad" })}
-                          >
-                            <option value="exact">Exact</option>
-                            <option value="phrase">Phrase</option>
-                            <option value="broad">Broad</option>
-                          </select>
-                        )}
-                        <input
-                          placeholder="$ 0.50"
-                          className="w-20 h-9 px-2 text-sm text-right font-mono rounded-md"
-                          style={{ border: "1px solid var(--border-default)", background: "var(--surface-card)" }}
-                          value={kw.bid} onChange={(e) => updateKeyword(gi, ki, { bid: e.target.value })}
-                        />
-                        {group.keywords.length > 1 && (
-                          <button className="p-1.5 rounded-md sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                            style={{ color: "var(--color-danger)" }} onClick={() => removeKeyword(gi, ki)}>
-                            {Icons.x}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
               </div>
-            </Card>
+            </div>
           ))}
 
-          {/* Add group + Generate */}
+          {/* Add campaign + Generate */}
           <div className="flex items-center justify-between">
-            <Btn variant="outline" onClick={() => setAdGroups((prev) => [...prev, { campaignName: "", name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }])}>
-              {Icons.plus} 添加广告组
+            <Btn variant="outline" onClick={() => setCampaigns((prev) => [...prev, {
+              name: "", adGroups: [{ name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }],
+            }])}>
+              {Icons.plus} 添加广告活动
             </Btn>
             <div className="flex items-center gap-3">
               <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                {uniqueCampaigns > 1 ? `${uniqueCampaigns} 个广告活动 · ` : ""}{validGroups.length} 个广告组 · {totalKeywords} 个{mode === "keyword" ? "关键词" : "ASIN"}
+                {validCampaignCount} 个广告活动 · {totalGroups} 个广告组 · {totalKeywords} 个{mode === "keyword" ? "关键词" : "ASIN"}
               </span>
-              <Btn variant="primary" disabled={validGroups.length === 0 || totalKeywords === 0} onClick={handleGenerate}>
+              <Btn variant="primary" disabled={totalGroups === 0 || totalKeywords === 0} onClick={handleGenerate}>
                 {Icons.zap} 生成 Bulk Sheet
               </Btn>
             </div>
