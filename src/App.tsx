@@ -378,6 +378,7 @@ interface ManualKeywordEntry {
 }
 
 interface ManualAdGroup {
+  campaignName: string;  // which campaign this group belongs to
   name: string;
   sku: string;
   asin: string;
@@ -385,13 +386,13 @@ interface ManualAdGroup {
 }
 
 function ManualCampaignTab() {
-  const [campaignName, setCampaignName] = useState("");
+  const [defaultCampaignName, setDefaultCampaignName] = useState("SP_Brand_Manual");
   const [budget, setBudget] = useState("10.00");
   const [defaultBid, setDefaultBid] = useState("0.50");
   const [biddingStrategy, setBiddingStrategy] = useState("Dynamic bids - down only");
   const [mode, setMode] = useState<"keyword" | "asin">("keyword");
   const [adGroups, setAdGroups] = useState<ManualAdGroup[]>([{
-    name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }],
+    campaignName: "", name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }],
   }]);
   const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
   const [stats, setStats] = useState<BulkSheetStats | null>(null);
@@ -438,18 +439,18 @@ function ManualCampaignTab() {
 
   // Quick template: create 3 ad groups (Exact/Phrase/Broad) with same keywords
   const handleQuickTemplate = useCallback(() => {
-    const baseName = campaignName || "SP_Manual";
+    const baseName = defaultCampaignName || "SP_Manual";
     const sku = adGroups[0]?.sku || "";
     const asin = adGroups[0]?.asin || "";
     const existingKws = adGroups[0]?.keywords.filter((k) => k.keyword.trim()) || [];
     const templateKws = existingKws.length > 0 ? existingKws : [{ keyword: "", matchType: "exact" as const, bid: "" }];
 
     setAdGroups([
-      { name: `${baseName}_Exact`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "exact" as const })) },
-      { name: `${baseName}_Phrase`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "phrase" as const })) },
-      { name: `${baseName}_Broad`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "broad" as const })) },
+      { campaignName: "", name: `${baseName}_Exact`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "exact" as const })) },
+      { campaignName: "", name: `${baseName}_Phrase`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "phrase" as const })) },
+      { campaignName: "", name: `${baseName}_Broad`, sku, asin, keywords: templateKws.map((k) => ({ ...k, matchType: "broad" as const })) },
     ]);
-  }, [campaignName, adGroups]);
+  }, [defaultCampaignName, adGroups]);
 
   // File import handler
   const handleFileImport = useCallback((file: File) => {
@@ -475,10 +476,11 @@ function ManualCampaignTab() {
       adDetailRows = [];
       for (const group of adGroups) {
         if (!group.name.trim() || (!group.sku.trim() && !group.asin.trim())) continue;
+        const campName = group.campaignName.trim() || defaultCampaignName || "Manual Campaign";
         for (const kw of group.keywords) {
           if (!kw.keyword.trim()) continue;
           adDetailRows.push({
-            campaignName: campaignName || "Manual Campaign",
+            campaignName: campName,
             adGroupName: group.name,
             budget: parseFloat(budget) || 10,
             sku: group.sku,
@@ -498,7 +500,7 @@ function ManualCampaignTab() {
     const opts: BulkSheetOptions = { defaultAdGroupBid: defaultBid, targetingType: "manual", mode };
     const result = generateBulkSheet(adDetailRows, opts);
     setBulkRows(result); setStats(getBulkSheetStats(result)); setGenerated(true);
-  }, [inputSource, fileRows, adGroups, campaignName, budget, defaultBid, biddingStrategy, mode]);
+  }, [inputSource, fileRows, adGroups, defaultCampaignName, budget, defaultBid, biddingStrategy, mode]);
 
   const handleDownload = useCallback(() => {
     const prefix = mode === "asin" ? "BULK ASIN" : "BULK MANUAL";
@@ -510,6 +512,7 @@ function ManualCampaignTab() {
 
   const totalKeywords = adGroups.reduce((sum, g) => sum + g.keywords.filter((k) => k.keyword.trim()).length, 0);
   const validGroups = adGroups.filter((g) => g.name.trim() && (g.sku.trim() || g.asin.trim()));
+  const uniqueCampaigns = new Set(validGroups.map((g) => g.campaignName.trim() || defaultCampaignName || "Manual Campaign")).size;
 
   return (
     <div className="space-y-5">
@@ -601,7 +604,7 @@ function ManualCampaignTab() {
             <CardHeader title="广告活动设置" />
             <div className="px-5 pb-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <Input label="广告活动名称" placeholder="SP_Brand_Manual" value={campaignName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCampaignName(e.target.value)} />
+                <Input label="默认广告活动名称" placeholder="SP_Brand_Manual" value={defaultCampaignName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultCampaignName(e.target.value)} />
                 <Input label="日预算 ($)" type="number" step="0.01" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBudget(e.target.value)} />
                 <Input label="默认竞价 ($)" type="number" step="0.01" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
                 <Select label="投放模式" value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "asin")}>
@@ -644,7 +647,9 @@ function ManualCampaignTab() {
                 </div>
               </div>
               <div className="p-5 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <Input label="广告活动" placeholder={defaultCampaignName || "使用默认名称"} value={group.campaignName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { campaignName: e.target.value })} />
                   <Input label="广告组名称" placeholder="e.g. Brand_Exact" value={group.name}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateAdGroup(gi, { name: e.target.value })} />
                   <Input label="SKU" placeholder="ABC-123" value={group.sku}
@@ -730,12 +735,12 @@ function ManualCampaignTab() {
 
           {/* Add group + Generate */}
           <div className="flex items-center justify-between">
-            <Btn variant="outline" onClick={() => setAdGroups((prev) => [...prev, { name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }])}>
+            <Btn variant="outline" onClick={() => setAdGroups((prev) => [...prev, { campaignName: "", name: "", sku: "", asin: "", keywords: [{ keyword: "", matchType: "exact", bid: "" }] }])}>
               {Icons.plus} 添加广告组
             </Btn>
             <div className="flex items-center gap-3">
               <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                {validGroups.length} 个广告组 · {totalKeywords} 个{mode === "keyword" ? "关键词" : "ASIN"}
+                {uniqueCampaigns > 1 ? `${uniqueCampaigns} 个广告活动 · ` : ""}{validGroups.length} 个广告组 · {totalKeywords} 个{mode === "keyword" ? "关键词" : "ASIN"}
               </span>
               <Btn variant="primary" disabled={validGroups.length === 0 || totalKeywords === 0} onClick={handleGenerate}>
                 {Icons.zap} 生成 Bulk Sheet
@@ -970,6 +975,11 @@ function AutoCampaignTab() {
   const [category, setCategory] = useState("");
   const [budget, setBudget] = useState("10.00");
   const [defaultBid, setDefaultBid] = useState("0.50");
+  const [useGroupBids, setUseGroupBids] = useState(false);
+  const [closeBid, setCloseBid] = useState("0.50");
+  const [looseBid, setLooseBid] = useState("0.30");
+  const [subsBid, setSubsBid] = useState("0.20");
+  const [compBid, setCompBid] = useState("0.15");
   const [structure, setStructure] = useState<"per-product" | "single">("per-product");
   const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
   const [stats, setStats] = useState<AutoCampaignStats | null>(null);
@@ -980,10 +990,20 @@ function AutoCampaignTab() {
   const validProducts = products.filter((p) => p.sku.trim() && p.asin.trim());
 
   const handleGenerate = useCallback(() => {
-    const config: AutoCampaignConfig = { brand, category, budget: parseFloat(budget) || 10, defaultBid: parseFloat(defaultBid) || 0.5, structure };
+    const config: AutoCampaignConfig = {
+      brand, category, budget: parseFloat(budget) || 10, defaultBid: parseFloat(defaultBid) || 0.5, structure,
+      ...(useGroupBids ? {
+        groupBids: {
+          closeMatch: parseFloat(closeBid) || 0.5,
+          looseMatch: parseFloat(looseBid) || 0.3,
+          substitutes: parseFloat(subsBid) || 0.2,
+          complements: parseFloat(compBid) || 0.15,
+        },
+      } : {}),
+    };
     const rows = generateAutoCampaigns(validProducts, config);
     setBulkRows(rows); setStats(getAutoCampaignStats(rows, validProducts.length, structure)); setGenerated(true);
-  }, [brand, category, budget, defaultBid, structure, validProducts]);
+  }, [brand, category, budget, defaultBid, structure, validProducts, useGroupBids, closeBid, looseBid, subsBid, compBid]);
 
   const handleDownload = useCallback(() => {
     downloadXlsx(
@@ -1097,12 +1117,44 @@ function AutoCampaignTab() {
             <Input label="品牌 *" placeholder="e.g. AGU" value={brand} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBrand(e.target.value)} />
             <Input label="品类 *" placeholder="e.g. Jersey" value={category} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCategory(e.target.value)} />
             <Input label="日预算 ($)" type="number" step="0.01" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBudget(e.target.value)} />
-            <Input label="默认竞价 ($)" type="number" step="0.01" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
             <Select label="结构" value={structure} onChange={(e) => setStructure(e.target.value as "per-product" | "single")}>
               <option value="per-product">每商品独立广告活动</option>
               <option value="single">合并为单个广告活动</option>
             </Select>
           </div>
+
+          {/* Bid configuration */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>竞价设置</label>
+              <div className="flex gap-0 rounded-md overflow-hidden" style={{ border: "1px solid var(--border-default)" }}>
+                <button
+                  className="px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{ background: !useGroupBids ? "var(--brand-primary)" : "var(--surface-card)", color: !useGroupBids ? "#fff" : "var(--text-tertiary)" }}
+                  onClick={() => setUseGroupBids(false)}
+                >统一竞价</button>
+                <button
+                  className="px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{ background: useGroupBids ? "var(--brand-primary)" : "var(--surface-card)", color: useGroupBids ? "#fff" : "var(--text-tertiary)", borderLeft: "1px solid var(--border-default)" }}
+                  onClick={() => setUseGroupBids(true)}
+                >分组竞价</button>
+              </div>
+            </div>
+
+            {!useGroupBids ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Input label="默认竞价 ($)" type="number" step="0.01" value={defaultBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDefaultBid(e.target.value)} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Input label="Close Match ($)" type="number" step="0.01" value={closeBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCloseBid(e.target.value)} />
+                <Input label="Loose Match ($)" type="number" step="0.01" value={looseBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLooseBid(e.target.value)} />
+                <Input label="Substitutes ($)" type="number" step="0.01" value={subsBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSubsBid(e.target.value)} />
+                <Input label="Complements ($)" type="number" step="0.01" value={compBid} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCompBid(e.target.value)} />
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
               {validProducts.length} 个有效商品{!brand && " · 请填写品牌"}{!category && " · 请填写品类"}
