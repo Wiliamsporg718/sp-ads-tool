@@ -51,6 +51,13 @@ export interface AutoCampaignConfig {
   namingDate?: string;
   /** Whether to create one campaign per product or one campaign for all */
   structure?: "per-product" | "single";
+  /** Which targeting groups to enable (default: all 4) */
+  enabledGroups?: {
+    closeMatch?: boolean;
+    looseMatch?: boolean;
+    substitutes?: boolean;
+    complements?: boolean;
+  };
 }
 
 const AUTO_TARGETING_GROUPS = [
@@ -81,6 +88,8 @@ export function generateAutoCampaigns(
   const namingDate = config.namingDate || formatDateDotted(new Date());
   const strategy = config.biddingStrategy || "Dynamic bids - down only";
   const structure = config.structure || "per-product";
+  const enabledGroups = config.enabledGroups || { closeMatch: true, looseMatch: true, substitutes: true, complements: true };
+  const activeGroups = AUTO_TARGETING_GROUPS.filter(g => enabledGroups[g.key as GroupKey] !== false);
 
   const result: BulkSheetRow[] = [];
 
@@ -117,7 +126,7 @@ export function generateAutoCampaigns(
       }
 
       // 4 Ad groups (one per targeting group)
-      for (const group of AUTO_TARGETING_GROUPS) {
+      for (const group of activeGroups) {
         const adGroupName = `${campaignName} - ${group.name}`;
         const groupBid = config.groupBids?.[group.key as GroupKey] ?? config.defaultBid;
 
@@ -181,7 +190,7 @@ export function generateAutoCampaigns(
     }
 
     // One ad group per targeting group, all products inside
-    for (const group of AUTO_TARGETING_GROUPS) {
+    for (const group of activeGroups) {
       const adGroupName = `${campaignName} - ${group.name}`;
       const groupBid = config.groupBids?.[group.key as GroupKey] ?? config.defaultBid;
 

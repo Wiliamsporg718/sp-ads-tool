@@ -980,6 +980,7 @@ function AutoCampaignTab() {
   const [looseBid, setLooseBid] = useState("0.30");
   const [subsBid, setSubsBid] = useState("0.20");
   const [compBid, setCompBid] = useState("0.15");
+  const [enabledGroups, setEnabledGroups] = useState({ closeMatch: true, looseMatch: false, substitutes: true, complements: false });
   const [structure, setStructure] = useState<"per-product" | "single">("per-product");
   const [bulkRows, setBulkRows] = useState<BulkSheetRow[]>([]);
   const [stats, setStats] = useState<AutoCampaignStats | null>(null);
@@ -992,6 +993,7 @@ function AutoCampaignTab() {
   const handleGenerate = useCallback(() => {
     const config: AutoCampaignConfig = {
       brand, category, budget: parseFloat(budget) || 10, defaultBid: parseFloat(defaultBid) || 0.5, structure,
+      enabledGroups,
       ...(useGroupBids ? {
         groupBids: {
           closeMatch: parseFloat(closeBid) || 0.5,
@@ -1003,7 +1005,7 @@ function AutoCampaignTab() {
     };
     const rows = generateAutoCampaigns(validProducts, config);
     setBulkRows(rows); setStats(getAutoCampaignStats(rows, validProducts.length, structure)); setGenerated(true);
-  }, [brand, category, budget, defaultBid, structure, validProducts, useGroupBids, closeBid, looseBid, subsBid, compBid]);
+  }, [brand, category, budget, defaultBid, structure, validProducts, useGroupBids, closeBid, looseBid, subsBid, compBid, enabledGroups]);
 
   const handleDownload = useCallback(() => {
     downloadXlsx(
@@ -1035,16 +1037,44 @@ function AutoCampaignTab() {
             ))}
           </div>
 
-          {/* 4 match types explanation */}
-          <div className="rounded-lg p-3 text-xs leading-relaxed" style={{ background: "var(--color-info-light)", color: "var(--color-info)", border: "1px solid var(--color-info)" }}>
-            <strong>Auto 广告 4 种匹配类型：</strong>
-            <span className="ml-1">
-              <strong>Close Match</strong>（紧密匹配）— 与商品高度相关的搜索词 ·
-              <strong> Loose Match</strong>（宽泛匹配）— 间接相关的搜索词 ·
-              <strong> Substitutes</strong>（替代品）— 与你商品相似的竞品详情页 ·
-              <strong> Complements</strong>（互补品）— 经常与你商品一起购买的商品详情页
-            </span>
-          </div>
+          {/* 4 match types toggle */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>启用的匹配类型</label>
+              <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                {Object.values(enabledGroups).filter(Boolean).length}/4 已启用
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {([
+                { key: "closeMatch" as const, label: "Close Match", desc: "紧密匹配 — 高相关搜索词" },
+                { key: "looseMatch" as const, label: "Loose Match", desc: "宽泛匹配 — 间接相关搜索词" },
+                { key: "substitutes" as const, label: "Substitutes", desc: "替代品 — 竞品详情页" },
+                { key: "complements" as const, label: "Complements", desc: "互补品 — 关联商品页" },
+              ]).map((g) => (
+                <button
+                  key={g.key}
+                  onClick={() => setEnabledGroups((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
+                  className="p-3 rounded-lg text-left transition-all"
+                  style={{
+                    border: `2px solid ${enabledGroups[g.key] ? "var(--brand-primary)" : "var(--border-default)"}`,
+                    background: enabledGroups[g.key] ? "var(--brand-primary-light, rgba(255,153,0,0.08))" : "var(--surface-card)",
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-4 h-4 rounded-sm flex items-center justify-center text-[10px]"
+                      style={{
+                        border: `1.5px solid ${enabledGroups[g.key] ? "var(--brand-primary)" : "var(--border-default)"}`,
+                        background: enabledGroups[g.key] ? "var(--brand-primary)" : "transparent",
+                        color: enabledGroups[g.key] ? "#fff" : "transparent",
+                      }}>✓</div>
+                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{g.label}</span>
+                  </div>
+                  <p className="text-[11px] leading-tight" style={{ color: "var(--text-tertiary)" }}>{g.desc}</p>
+                </button>
+              ))}
+            </div>
+          </Card>
 
       <Card>
         <CardHeader
